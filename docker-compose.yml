@@ -1,0 +1,11 @@
+services:
+  app:
+    build: .
+    container_name: entrevistas_api
+    volumes:
+      - .:/var/www/html
+    ports:
+      - "8095:8000"
+    # Docker asocia automáticamente el archivo .env local
+    env_file:
+      - .env
