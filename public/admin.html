@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Admin - Tutorías</title>
+    <style>
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        padding: 20px;
+      }
+      .hidden {
+        display: none;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 10px;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+      }
+      th {
+        background: #f4f4f4;
+      }
+      input[type="text"],
+      input[type="password"],
+      input[type="email"] {
+        padding: 6px;
+        width: 100%;
+      }
+      button {
+        padding: 6px 10px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+      .col {
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Panel Admin - Tutorías</h1>
+
+    <div id="loginBox">
+      <h3>Acceso administrador</h3>
+      <p>Introduce la contraseña admin.</p>
+      <div style="max-width: 480px">
+        <input
+          id="adminPassword"
+          type="password"
+          placeholder="Contraseña admin"
+        />
+        <div style="margin-top: 8px">
+          <button id="btnLogin">Entrar</button>
+        </div>
+        <p id="loginMsg" style="color: red"></p>
+      </div>
+    </div>
+
+    <div id="panel" class="hidden">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div>
+          <button id="btnLogout">Cerrar sesión</button>
+        </div>
+        <div>
+          <button id="btnRefresh">Refrescar tutores</button>
+        </div>
+      </div>
+
+      <h3>Crear tutor</h3>
+      <div style="max-width: 640px" class="row">
+        <input id="newNombre" type="text" class="col" placeholder="Nombre" />
+        <input
+          id="newEmail"
+          type="email"
+          class="col"
+          placeholder="Email (opcional)"
+        />
+        <button id="btnCreate">Crear</button>
+      </div>
+
+      <h3>Lista de tutores</h3>
+      <table id="tutoresTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Email</th>
+            <th>Activo</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <h3>Subir CSV de preregistros</h3>
+      <p>
+        Selecciona un tutor en la tabla y usa el botón "Seleccionar/Enviar"
+        dentro de su fila.
+      </p>
+
+      <p style="margin-top: 18px; color: #666">
+        Nota: esta interfaz usa la cabecera <code>X-Admin-Password</code> para
+        autenticar.
+      </p>
+    </div>
+
+    <script src="/admin.js"></script>
+  </body>
+</html>
