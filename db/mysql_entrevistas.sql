@@ -58,7 +58,6 @@ CREATE TABLE IF NOT EXISTS `datos_familiares` (
   `horas_trabajo` INT DEFAULT NULL,
   `empresa_trabajo` VARCHAR(100) DEFAULT NULL,
   `motivo_trabajo` VARCHAR(255) DEFAULT NULL,
-  `tiempo_traslado_escuela` VARCHAR(20) DEFAULT NULL,
   `apoyo_economico` VARCHAR(50) DEFAULT NULL,
   `ingreso_mensual_familiar` DECIMAL(10,2) DEFAULT NULL,
   FOREIGN KEY (`estudiante_id`) REFERENCES `estudiantes`(`id`) ON DELETE CASCADE
@@ -231,3 +230,26 @@ SET @ddl := IF(@idx_exists = 0,
 PREPARE stmt FROM @ddl;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+
+-- 3) Eliminar la columna redundante `datos_familiares.tiempo_traslado_escuela`.
+--    El tiempo de traslado se recaba una sola vez en
+--    `estudiantes.tiempo_traslado_transporte`, que es el campo que especifica
+--    form.md (los dos tenían rangos distintos y no eran reconciliables).
+--    Se elimina solo si existe, para no romper un alta nueva.
+--    AVISO: los valores que tenga se descartan. Si quieres conservarlos:
+--      CREATE TABLE respaldo_tiempo_traslado AS
+--        SELECT estudiante_id, tiempo_traslado_escuela FROM datos_familiares
+--        WHERE tiempo_traslado_escuela IS NOT NULL;
+SET @col_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name  = 'datos_familiares'
+    AND column_name = 'tiempo_traslado_escuela'
+);
+SET @ddl2 := IF(@col_exists > 0,
+  'ALTER TABLE `datos_familiares` DROP COLUMN `tiempo_traslado_escuela`',
+  'SELECT 1');
+PREPARE stmt2 FROM @ddl2;
+EXECUTE stmt2;
+DEALLOCATE PREPARE stmt2;
