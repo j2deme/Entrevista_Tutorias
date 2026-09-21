@@ -23,11 +23,16 @@ class Estudiante extends Model
     'codigo_postal',
     'zona',
     'tipo_vivienda',
+    'tipo_vivienda_otro',
     'telefono_movil',
     'habla_otra_lengua',
     'cual_lengua',
+    'usa_transporte_publico',
+    'tiempo_traslado_transporte',
+    'costo_transporte',
     'tutor_id',
-    'periodo_captura'
+    'periodo_captura',
+    'capturado'
   ];
 
   // Relaciones con las tablas detalladas
