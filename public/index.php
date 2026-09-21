@@ -6,6 +6,7 @@ use Slim\Factory\AppFactory;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use App\Models\Estudiante;
 use App\Models\DatosFamiliares;
 use App\Models\DatosEscolares;
@@ -856,7 +857,7 @@ function tutor_report_payload(int $tutorId): array
   })->count();
 
   $list = Capsule::table('estudiantes')->where('tutor_id', $tutorId)
-    ->select('id', 'numero_control', 'capturado', 'created_at', 'updated_at')
+    ->select('id', 'numero_control', 'nombre_completo', 'periodo_captura', 'capturado', 'created_at', 'updated_at')
     ->orderBy('numero_control')->get();
 
   return ['tutor_id' => $tutorId, 'total' => $total, 'captured' => $captured, 'pending' => $pending, 'list' => $list];
@@ -881,6 +882,240 @@ $app->get('/api/admin/tutores/{id}/report', function (Request $request, Response
 });
 
 
+// --- Utilidades del Excel de respuestas -----------------------------------
+
+// Catálogo de columnas de una tabla con su tipo real (information_schema),
+// para formatear booleanos y enums en el reporte. Si la tabla no existe
+// devuelve vacío y la hoja sale solo con encabezados.
+function table_columns(string $table): array
+{
+  try {
+    $rows = Capsule::select(
+      'SELECT `column_name` AS c, `data_type` AS dt, `column_type` AS ct
+         FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = ?',
+      [$table]
+    );
+  } catch (\Throwable $e) {
+    return [];
+  }
+  $out = [];
+  foreach ($rows as $r) {
+    $out[$r->c] = ['dt' => (string) $r->dt, 'ct' => (string) $r->ct];
+  }
+  return $out;
+}
+
+// Rótulo legible a partir del nombre de columna en la BD.
+function col_label(string $col): string
+{
+  static $over = [
+    'numero_control'                => 'Número de control',
+    'nombre_completo'               => 'Nombre completo',
+    'fecha_nacimiento'              => 'Fecha de nacimiento',
+    'lugar_nacimiento'              => 'Lugar de nacimiento',
+    'genero'                        => 'Género',
+    'codigo_postal'                 => 'Código postal',
+    'zona'                          => 'Zona',
+    'telefono_movil'                => 'Teléfono móvil',
+    'habla_otra_lengua'             => '¿Habla otra lengua?',
+    'cual_lengua'                   => 'Otra lengua que habla',
+    'usa_transporte_publico'        => '¿Usa transporte público?',
+    'tiempo_traslado_transporte'    => 'Tiempo de traslado (transporte público)',
+    'costo_transporte'              => 'Costo del transporte',
+    'periodo_captura'               => 'Periodo de captura',
+    'capturado'                     => 'Capturado',
+    'created_at'                    => 'Creado',
+    'updated_at'                    => 'Actualizado',
+    'lugar_que_ocupa'               => 'Lugar que ocupa en la familia',
+    'situacion_especial'            => 'Situación especial',
+    'relacion_padres'               => 'Relación entre padres',
+    'trabaja_actualmente'           => '¿Trabaja actualmente?',
+    'horas_trabajo'                 => 'Horas de trabajo',
+    'empresa_trabajo'               => 'Empresa / lugar de trabajo',
+    'ingreso_mensual_familiar'      => 'Ingreso mensual familiar',
+    'institucion_procedencia'       => 'Institución de procedencia',
+    'reprobado_curso'               => '¿Ha reprobado algún curso?',
+    'satisfecho_resultados'         => '¿Satisfecho con los resultados?',
+    'ha_estado_becado'              => '¿Ha estado becado?',
+    'reaccion_padres_calificaciones'=> 'Reacción de los padres ante las calificaciones',
+    'comprension_lectora'           => 'Comprensión lectora',
+    'comprension_oral'              => 'Comprensión oral',
+    'resolucion_problemas'          => 'Resolución de problemas',
+    'expresion_oral'                => 'Expresión oral',
+    'expresion_escrita'             => 'Expresión escrita',
+    'expresion_grafica'             => 'Expresión gráfica',
+    'calculo'                       => 'Cálculo',
+    'ortografia'                    => 'Ortografía',
+    'padece_enfermedad'             => '¿Padece alguna enfermedad?',
+    'cual_enfermedad'               => '¿Cuál enfermedad?',
+    'condicion_fisica'              => 'Condición física',
+    'cual_condicion'                => '¿Cuál condición?',
+    'toma_medicacion'               => '¿Toma medicación?',
+    'cual_medicacion'               => '¿Cuál medicación?',
+    'ha_sido_operado'               => '¿Ha sido operado?',
+    'de_que_operacion'              => '¿De qué operación?',
+    'carrera_gusta'                 => '¿Le gusta su carrera?',
+    'que_mas_atrae'                 => '¿Qué más le atrae?',
+    'tiene_preocupacion_curso'      => '¿Tiene alguna preocupación?',
+    'que_preocupa'                  => '¿Qué le preocupa?',
+    'estudio_es'                    => 'Considera que estudiar es',
+    'forma_apoyo_institucion'       => 'Forma de apoyo de la institución',
+    'desea_apoyo_institucional'     => '¿Desea apoyo institucional?',
+    'tipo_apoyo'                    => 'Tipo de apoyo',
+    'causa_problemas_estudio'       => '¿Qué causa problemas de estudio?',
+    'preferencia_trabajo'           => 'Preferencia de trabajo',
+    'forma_pasartiempo'             => 'Cómo pasa el tiempo libre',
+    'forma_hacer_amigos'            => 'Cómo hace amigos',
+    'tiempo_estudio_casa'           => 'Tiempo de estudio en casa',
+    'cuenta_lugar_adecuado'         => '¿Cuenta con lugar adecuado para estudiar?',
+    'prio_explicacion_clara'        => 'Prioridad 1: explicación clara',
+    'prio_entienda_jovenes'         => 'Prioridad 2: que entienda a los jóvenes',
+    'prio_justo_evaluar'            => 'Prioridad 3: que sea justo al evaluar',
+    'prio_permita_preguntar'        => 'Prioridad 4: que permita preguntar',
+    'prio_respete_e_imponga'        => 'Prioridad 5: que respete e imponga autoridad',
+    'prio_no_se_enoje'              => 'Prioridad 6: que no se enoje',
+    'prio_otra'                     => 'Prioridad 7: otra cualidad',
+  ];
+  return $over[$col] ?? ucfirst(str_replace('_', ' ', $col));
+}
+
+// Formato de celda: Sí/No en booleanos, enum legible (guion bajo -> espacio),
+// el resto como texto. `null` queda en celda vacía.
+function cell_text($val, array $meta): string
+{
+  if ($val === null)
+    return '';
+  if (($meta['ct'] ?? '') === 'tinyint(1)')
+    return $val ? 'Sí' : 'No';
+  if (($meta['dt'] ?? '') === 'enum')
+    return str_replace('_', ' ', (string) $val);
+  return is_scalar($val) ? (string) $val : '';
+}
+
+// Escribe una hoja: encabezado en la fila 1 (congelada) y filas de datos.
+function write_sheet($sheet, string $title, array $headers, array $rows): void
+{
+  $sheet->setTitle($title);
+  $sheet->freezePane('A2');
+  foreach ($headers as $i => $h) {
+    $letter = Coordinate::stringFromColumnIndex($i + 1);
+    $width  = min(42, max(12, function_exists('mb_strlen') ? mb_strlen($h) + 2 : strlen($h) + 2));
+    $sheet->setCellValue($letter . '1', $h);
+    $sheet->getColumnDimension($letter)->setWidth($width);
+  }
+  $r = 2;
+  foreach ($rows as $row) {
+    foreach ($row as $i => $v) {
+      $sheet->setCellValue(Coordinate::stringFromColumnIndex($i + 1) . $r, $v);
+    }
+    $r++;
+  }
+}
+
+// Endpoint admin: Excel con TODAS las respuestas de los tutorados de un tutor.
+// Una hoja por bloque de datos, enlazadas por `numero_control`:
+//   Datos personales · Datos familiares · Datos escolares ·
+//   Habilidades · Datos médicos · Expectativas
+$app->get('/api/admin/tutores/{id}/exportar', function (Request $request, Response $response, $args) {
+  if (!check_admin($request)) {
+    $response->getBody()->write(json_encode(['error' => 'Autenticación admin requerida']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
+  }
+  $tutorId = intval($args['id']);
+  $tutor   = Capsule::table('tutores')->where('id', $tutorId)->first();
+  if (!$tutor) {
+    $response->getBody()->write(json_encode(['error' => 'Tutor no encontrado']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+  }
+
+  // [título de hoja, tabla, columnas a omitir]
+  $bloques = [
+    ['Datos personales', 'estudiantes',           ['id', 'tutor_id']],
+    ['Datos familiares', 'datos_familiares',      ['estudiante_id']],
+    ['Datos escolares',  'datos_escolares',       ['estudiante_id']],
+    ['Habilidades',      'habilidades_escolares', ['estudiante_id']],
+    ['Datos médicos',    'datos_medicos',         ['estudiante_id']],
+    ['Expectativas',     'expectativas_ingreso',  ['estudiante_id']],
+  ];
+
+  $spreadsheet = new Spreadsheet();
+  $first       = true;
+
+  foreach ($bloques as [$title, $table, $skip]) {
+    $meta   = table_columns($table);
+    $cols   = array_values(array_diff(array_keys($meta), $skip));
+    $isMain = $table === 'estudiantes';
+
+    try {
+      if ($isMain) {
+        // Datos personales: ya son los del propio estudiante del tutor.
+        $query = Capsule::table('estudiantes')->where('tutor_id', $tutorId);
+        $sel   = [];
+      } else {
+        // Hijas: se enlazan con `estudiantes` para filtrar por tutor y
+        // traer su número de control como primera columna.
+        $query = Capsule::table($table)
+          ->join('estudiantes', 'estudiantes.id', '=', $table . '.estudiante_id')
+          ->where('estudiantes.tutor_id', $tutorId);
+        $sel = ['estudiantes.numero_control AS numero_control'];
+      }
+      foreach ($cols as $c) {
+        $sel[] = ($isMain ? '' : $table . '.') . $c . ' AS ' . $c;
+      }
+
+      $rows = $query->select($sel)->orderBy('estudiantes.numero_control')->get();
+    } catch (\Throwable $e) {
+      // Tabla ausente en esta BD: la hoja sale solo con encabezados en
+      // vez de abortar la descarga completa.
+      error_log("exportar tutorados: falló la tabla {$table}: " . $e->getMessage());
+      $rows = [];
+    }
+
+    $headers = [];
+    foreach ($cols as $c) {
+      $headers[] = col_label($c);
+    }
+    if (!$isMain) {
+      array_unshift($headers, col_label('numero_control'));
+    }
+
+    $data = [];
+    foreach ($rows as $row) {
+      $out = [];
+      foreach ($cols as $c) {
+        $out[] = cell_text($row->$c ?? null, $meta[$c] ?? []);
+      }
+      if (!$isMain) {
+        array_unshift($out, (string) ($row->numero_control ?? ''));
+      }
+      $data[] = $out;
+    }
+
+    if ($first) {
+      $sheet = $spreadsheet->getActiveSheet();
+      $first = false;
+    } else {
+      $sheet = $spreadsheet->createSheet();
+    }
+    write_sheet($sheet, $title, $headers, $data);
+  }
+
+  $slug     = strtolower(trim(preg_replace('/[^a-zA-Z0-9]+/', '-', (string) $tutor->nombre), '-'));
+  $filename = 'respuestas_tutor_' . ($slug !== '' ? $slug : $tutorId) . '.xlsx';
+
+  $writer = new Xlsx($spreadsheet);
+  $stream = fopen('php://memory', 'r+');
+  $writer->save($stream);
+  rewind($stream);
+
+  return $response
+    ->withBody(new \Slim\Psr7\Stream($stream))
+    ->withHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    ->withHeader('Content-Disposition', 'attachment; filename="' . $filename . '"');
+});
+
+
 // Endpoint admin: ping rápido para verificar credenciales admin
 $app->get('/api/admin/ping', function (Request $request, Response $response) {
   if (!check_admin($request)) {
@@ -899,7 +1134,47 @@ $app->get('/api/admin/tutores', function (Request $request, Response $response) 
     return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
   }
   $rows = Capsule::table('tutores')->select('id', 'nombre', 'email', 'active')->orderBy('nombre')->get();
-  $response->getBody()->write(json_encode(['tutores' => $rows]));
+
+  // Desglose de avance por tutor. Una sola consulta agregada (sin N+1).
+  // `capturado = 1` cuenta lo capturado; el resto (0 o NULL) queda pendiente.
+  $agg = Capsule::table('estudiantes')
+    ->selectRaw('tutor_id, COUNT(*) AS total, SUM(CASE WHEN capturado = 1 THEN 1 ELSE 0 END) AS done')
+    ->groupBy('tutor_id')
+    ->get();
+  $byTutor = [];
+  $sinTutor = ['total' => 0, 'done' => 0];
+  foreach ($agg as $a) {
+    $bucket = ['total' => (int) $a->total, 'done' => (int) $a->done];
+    if ($a->tutor_id === null) {
+      $sinTutor = $bucket;   // huérfanos: tutor eliminado (FK SET NULL)
+      continue;
+    }
+    $byTutor[(int) $a->tutor_id] = $bucket;
+  }
+
+  $gTotal = 0;
+  $gDone  = 0;
+  foreach ($rows as $r) {
+    $b = $byTutor[(int) $r->id] ?? ['total' => 0, 'done' => 0];
+    $r->total     = $b['total'];
+    $r->captured  = $b['done'];
+    $r->pending   = $b['total'] - $b['done'];
+    $gTotal      += $b['total'];
+    $gDone       += $b['done'];
+  }
+  $gTotal += $sinTutor['total'];
+  $gDone  += $sinTutor['done'];
+
+  $resumen = [
+    'total'           => $gTotal,
+    'captured'        => $gDone,
+    'pending'         => $gTotal - $gDone,
+    'sin_tutor'       => $sinTutor['total'],
+    'tutores'         => count($rows),
+    'tutores_activos' => $rows->where('active', 1)->count(),
+  ];
+
+  $response->getBody()->write(json_encode(['tutores' => $rows, 'resumen' => $resumen]));
   return $response->withHeader('Content-Type', 'application/json');
 });
 

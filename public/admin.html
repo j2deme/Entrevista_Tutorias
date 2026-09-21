@@ -41,6 +41,100 @@
       .col {
         flex: 1;
       }
+
+      /* --- Dashboard de avance --- */
+      .cards {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 16px 0 10px;
+      }
+      .card {
+        flex: 1;
+        min-width: 150px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 12px;
+        text-align: center;
+        background: #fafafa;
+      }
+      .card .num {
+        display: block;
+        font-size: 26px;
+        font-weight: bold;
+      }
+      .card .lbl {
+        font-size: 12px;
+        color: #666;
+      }
+      .card.ok .num {
+        color: #16a34a;
+      }
+      .card.warn .num {
+        color: #d97706;
+      }
+      .bar {
+        background: #eee;
+        border-radius: 4px;
+        height: 10px;
+        min-width: 90px;
+        overflow: hidden;
+      }
+      .bar > span {
+        display: block;
+        height: 100%;
+        background: #16a34a;
+      }
+      .pct {
+        font-size: 12px;
+        color: #666;
+        margin-top: 2px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .badge.ok {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .badge.pend {
+        background: #fef3c7;
+        color: #92400e;
+      }
+
+      /* --- Modal de tutorados --- */
+      .modalOverlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        z-index: 50;
+      }
+      .modalOverlay.hidden {
+        display: none;
+      }
+      .modalBox {
+        background: #fff;
+        border-radius: 6px;
+        max-width: 860px;
+        width: 100%;
+        max-height: 85vh;
+        overflow: auto;
+        padding: 16px;
+      }
+      .modalHead {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
     </style>
   </head>
   <body>
@@ -78,6 +172,16 @@
         </div>
       </div>
 
+      <h3>Desglose de avance</h3>
+      <div class="cards">
+        <div class="card"><span class="num" id="kTotal">–</span><span class="lbl">Tutorados</span></div>
+        <div class="card ok"><span class="num" id="kCaptured">–</span><span class="lbl">Respondieron</span></div>
+        <div class="card warn"><span class="num" id="kPending">–</span><span class="lbl">Pendientes</span></div>
+        <div class="card"><span class="num" id="kSinTutor">–</span><span class="lbl">Sin tutor</span></div>
+        <div class="card"><span class="num" id="kPct">–</span><span class="lbl">Avance global</span></div>
+      </div>
+      <p id="avanceBarra" class="bar" style="max-width: 420px"><span style="width: 0%"></span></p>
+
       <h3>Crear tutor</h3>
       <div style="max-width: 640px" class="row">
         <input id="newNombre" type="text" class="col" placeholder="Nombre" />
@@ -98,6 +202,11 @@
             <th>Nombre</th>
             <th>Email</th>
             <th>Activo</th>
+            <th>Tutorados</th>
+            <th>Respondieron</th>
+            <th>Pendientes</th>
+            <th>Avance</th>
+            <th>Carga CSV</th>
             <th>Acciones</th>
           </tr>
         </thead>
@@ -114,6 +223,28 @@
         Nota: esta interfaz usa la cabecera <code>X-Admin-Password</code> para
         autenticar.
       </p>
+    </div>
+
+    <div id="modalTutorados" class="modalOverlay hidden">
+      <div class="modalBox">
+        <div class="modalHead">
+          <h3 id="modalTitle">Tutorados</h3>
+          <button id="btnCloseModal">Cerrar</button>
+        </div>
+        <p id="modalStats"></p>
+        <table id="tutoradosTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Número de control</th>
+              <th>Nombre</th>
+              <th>Estado</th>
+              <th>Última actualización</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
 
     <script src="/admin.js"></script>
