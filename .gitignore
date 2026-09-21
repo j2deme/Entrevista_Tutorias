@@ -1,5 +1,4 @@
 .env
 vendor/
-composer.lock
 example.json
 Entrevista Ficha Escolar.pdf
