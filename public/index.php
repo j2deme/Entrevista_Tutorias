@@ -254,7 +254,6 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
     'horasTrabajo' => $in['horas_trabajo'] ?? ($in['horasTrabajo'] ?? null),
     'empresaTrabajo' => $in['empresa_trabajo'] ?? ($in['empresaTrabajo'] ?? null),
     'motivoTrabajo' => $in['motivo_trabajo'] ?? ($in['motivoTrabajo'] ?? null),
-    'tiempoTrasladoEscuela' => $in['tiempo_traslado_escuela'] ?? ($in['tiempoTrasladoEscuela'] ?? null),
     'apoyoEconomico' => $in['apoyo_economico'] ?? ($in['apoyoEconomico'] ?? null),
     'ingresoMensualFamiliar' => $in['ingreso_mensual_familiar'] ?? ($in['ingresoMensualFamiliar'] ?? null)
   ];
@@ -604,7 +603,6 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
         'horas_trabajo' => int_or_null($df['horasTrabajo']),
         'empresa_trabajo' => $df['empresaTrabajo'] ?? null,
         'motivo_trabajo' => $df['motivoTrabajo'] ?? null,
-        'tiempo_traslado_escuela' => $df['tiempoTrasladoEscuela'] ?? null,
         'apoyo_economico' => $df['apoyoEconomico'] ?? null,
         'ingreso_mensual_familiar' => num_or_null($df['ingresoMensualFamiliar'])
       ]);

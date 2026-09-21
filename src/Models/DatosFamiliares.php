@@ -34,7 +34,6 @@ class DatosFamiliares extends Model
     'horas_trabajo',
     'empresa_trabajo',
     'motivo_trabajo',
-    'tiempo_traslado_escuela',
     'apoyo_economico',
     'ingreso_mensual_familiar'
   ];
