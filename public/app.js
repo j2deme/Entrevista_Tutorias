@@ -12,24 +12,24 @@ document.addEventListener("DOMContentLoaded", () => {
     .catch(() => {});
   // Cargar lista de tutores activos para el select
   async function loadTutors() {
-    const sel = document.getElementById('tutorSelect');
+    const sel = document.getElementById("tutorSelect");
     if (!sel) return;
     try {
-      const r = await fetch('/api/tutores');
+      const r = await fetch("/api/tutores");
       const j = await r.json();
-      sel.innerHTML = '';
+      sel.innerHTML = "";
       if (j && Array.isArray(j.tutores) && j.tutores.length > 0) {
-        sel.appendChild(new Option('Selecciona un tutor...', '', true, false));
-        j.tutores.forEach(t => {
+        sel.appendChild(new Option("Selecciona un tutor...", "", true, false));
+        j.tutores.forEach((t) => {
           sel.appendChild(new Option(t.nombre, t.id));
         });
       } else {
-        sel.appendChild(new Option('No hay tutores activos', '', true, false));
+        sel.appendChild(new Option("No hay tutores activos", "", true, false));
         sel.disabled = true;
       }
     } catch (err) {
-      sel.innerHTML = '';
-      sel.appendChild(new Option('Error cargando tutores', '', true, false));
+      sel.innerHTML = "";
+      sel.appendChild(new Option("Error cargando tutores", "", true, false));
       sel.disabled = true;
     }
   }
@@ -340,32 +340,20 @@ document.addEventListener("DOMContentLoaded", () => {
       if (value === "1") value = true;
       if (value === "0") value = false;
 
-      // Transformar datos numéricos
+      // Transformar datos numéricos cuando aplique
       if (!isNaN(value) && value !== "" && typeof value !== "boolean") {
-        value = Number(value);
+        const n = Number(value);
+        if (!Number.isNaN(n)) value = n;
       }
 
-      data[key] = value;
+      // Manejar múltiples valores con mismo name (checkboxes)
+      if (data.hasOwnProperty(key)) {
+        if (!Array.isArray(data[key])) data[key] = [data[key]];
+        data[key].push(value);
+      } else {
+        data[key] = value;
+      }
     });
-
-    // Normalizar valor de 'vivesCon' si se usó la opción 'OTROS' y hay un campo especificador
-    if (data.vivesCon === "OTROS" && data.vivesConOtro) {
-      data.vivesCon = data.vivesConOtro;
-      delete data.vivesConOtro;
-    }
-
-    // Componer causas de problemas de estudio desde checkboxes + campo libre
-    const causas = [];
-    if (data.causa_me_organizo_mal) causas.push("Me organizo mal");
-    if (data.causa_no_me_interesa) causas.push("No me interesa");
-    if (data.causa_por_distrarme) causas.push("Por distraerme en otra cosa");
-    if (data.causa_no_tengo_lugar)
-      causas.push("No tengo lugar adecuado para estudiar");
-    if (data.causaProblemasEstudio && String(data.causaProblemasEstudio).trim())
-      causas.push(String(data.causaProblemasEstudio).trim());
-    data.causaProblemasEstudioComposed = causas.length
-      ? causas.join("; ")
-      : null;
 
     // Validar prioridades antes de componer el payload
     if (!validatePriorities()) {
@@ -378,133 +366,55 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Estructuración de Payloads anidados
-    const payload = {
-      datosPersonales: {
-        nombreCompleto: data.nombreCompleto,
-        numeroControl: data.numeroControl || null,
-        fechaNacimiento: data.fechaNacimiento,
-        lugarNacimiento: data.lugarNacimiento,
-        edad: data.edad,
-        genero: data.genero,
-        estadoCivil: data.estadoCivil,
-        domicilioFamiliar: data.domicilioFamiliar,
-        localidadFamiliar: data.localidadFamiliar,
-        codigoPostal: String(data.codigoPostal),
-        zona: data.zona,
-        tipoVivienda: data.tipoVivienda,
-        telefonoMovil: String(data.telefonoMovil),
-        hablaOtraLengua: data.hablaOtraLengua,
-        cualLengua: data.hablaOtraLengua ? data.cualLengua : null,
-      },
-      datosFamiliares: {
-        padre: {
-          nombre: data.padreNombre,
-          vive: data.padreVive,
-          edad: data.padreEdad,
-          profesion: data.padreProfesion,
-          nivelEstudios: data.padreNivelEstudios,
-          ocupacion: data.padreOcupacion,
-        },
-        madre: {
-          nombre: data.madreNombre,
-          vive: data.madreVive,
-          edad: data.madreEdad,
-          profesion: data.madreProfesion,
-          nivelEstudios: data.madreNivelEstudios,
-          ocupacion: data.madreOcupacion,
-        },
-        numIntegrantesFamilia: data.numIntegrantesFamilia,
-        numHermanos: data.numHermanos,
-        lugarQueOcupa: data.lugarQueOcupa,
-        vivesCon: data.vivesCon,
-        situacionEspecial: data.situacionEspecial,
-        relacionPadres: data.relacionPadres,
-        trabajaActualmente: data.trabajaActualmente,
-        horasTrabajo: data.horasTrabajo,
-        empresaTrabajo: data.empresaTrabajo,
-        motivoTrabajo: data.motivoTrabajo,
-        tiempoTrasladoEscuela: data.tiempoTrasladoEscuela,
-        apoyoEconomico: data.apoyoEconomico,
-        ingresoMensualFamiliar: data.ingresoMensualFamiliar,
-      },
-      datosEscolares: {
-        institucionProcedencia: data.institucionProcedencia,
-        localidad: data.localidadEscuela,
-        generacionEgreso: data.generacionEgreso,
-        promedio: data.promedio,
-        rendimientoEscolar: data.rendimientoEscolar,
-        reprobadoCurso: data.reprobadoCurso,
-        causaReprobacion: data.causaReprobacion,
-        satisfechoResultados: data.satisfechoResultados,
-        motivoSatisfaccion: data.motivoSatisfaccion,
-        haEstadoBecado: data.haEstadoBecado,
-        gradoBeca: data.gradoBeca,
-        tipoBeca:
-          data.tipoBeca === "OTRA"
-            ? data.tipoBecaOtro || "OTRA"
-            : data.tipoBeca,
-        materiasFavoritas: data.materiasFavoritas,
-        habilidades: {
-          comprensionLectora:
-            data.habilidades?.comprensionLectora || data.hab_comprensionLectora,
-          comprensionOral:
-            data.habilidades?.comprensionOral || data.hab_comprensionOral,
-          resolucionProblemas:
-            data.habilidades?.resolucionProblemas ||
-            data.hab_resolucionProblemas,
-          expresionOral:
-            data.habilidades?.expresionOral || data.hab_expresionOral,
-          expresionEscrita:
-            data.habilidades?.expresionEscrita || data.hab_expresionEscrita,
-          vocabulario: data.habilidades?.vocabulario || data.hab_vocabulario,
-          calculo: data.habilidades?.calculo || data.hab_calculo,
-          expresionGrafica:
-            data.habilidades?.expresionGrafica || data.hab_expresionGrafica,
-          ortografia: data.habilidades?.ortografia || data.hab_ortografia,
-        },
-        reaccionPadresCalificaciones: data.reaccionPadresCalificaciones,
-      },
-      datosMedicos: {
-        padeceEnfermedad: data.padeceEnfermedad,
-        cualEnfermedad: data.cualEnfermedad || null,
-        condicionFisica: data.condicionFisica,
-        cualCondicion: data.cualCondicion || null,
-        tomaMedicacion: data.tomaMedicacion,
-        cualMedicacion: data.cualMedicacion || null,
-        haSidoOperado: data.haSidoOperado,
-        deQueOperacion: data.deQueOperacion || null,
-      },
-      expectativasIngreso: {
-        carreraGusta: data.carreraGusta,
-        queMasAtrae: data.queMasAtrae,
-        tienePreocupacionCurso: data.tienePreocupacionCurso,
-        quePreocupa: data.tienePreocupacionCurso ? data.quePreocupa : null,
-        estudioEs: data.estudioEs,
-        deseaApoyoInstitucional: data.deseaApoyoInstitucional,
-        tipoApoyo: data.deseaApoyoInstitucional ? data.tipoApoyo : null,
-        pasatiempoFavorito: data.pasatiempoFavorito,
-        causaProblemasEstudio: data.causaProblemasEstudioComposed,
-        preferenciaTrabajo: data.preferenciaTrabajo,
-        preferenciaEnClase: data.preferenciaEnClase || null,
-        formaPasarTiempo: data.formaPasarTiempo || null,
-        formaHacerAmigos: data.formaHacerAmigos || null,
-        cuentaLugarAdecuado: data.cuentaLugarAdecuado,
-        prioridadesProfesor: {
-          explicacionClara: data.prio_explicacionClara,
-          entiendaJovenes: data.prio_entiendaJovenes,
-          justoEvaluar: data.prio_justoEvaluar,
-          permitaPreguntar: data.prio_permitaPreguntar,
-          respeteEImponga: data.prio_respeteEImponga,
-          noSeEnoje: data.prio_noSeEnoje,
-        },
-      },
-    };
+    // Normalizar claves a snake_case (acepta tanto camelCase como snake_case)
+    function camelToSnake(s) {
+      return String(s)
+        .replace(/([A-Z])/g, "_$1")
+        .toLowerCase();
+    }
 
-    // Añadir campos de control: honeypot y token CSRF
-    payload.hp_email = data.hp_email || "";
-    payload.csrfToken =
-      document.getElementById("csrfToken")?.value || window.__csrfToken || "";
+    const payload = {};
+    Object.entries(data).forEach(([k, v]) => {
+      const sk = camelToSnake(k);
+      payload[sk] = v;
+    });
+
+    // Normalizar valor de 'vives_con' si se usó la opción 'OTROS' y hay un campo especificador
+    if (payload.vives_con === "OTROS" && payload.vives_con_otro) {
+      payload.vives_con = payload.vives_con_otro;
+      delete payload.vives_con_otro;
+    }
+
+    // Componer causas de problemas de estudio desde checkboxes + campo libre
+    const causas = [];
+    if (payload.causa_me_organizo_mal) causas.push("Me organizo mal");
+    if (payload.causa_no_me_interesa) causas.push("No me interesa");
+    if (payload.causa_por_distrarme) causas.push("Por distraerme en otra cosa");
+    if (payload.causa_no_tengo_lugar)
+      causas.push("No tengo lugar adecuado para estudiar");
+    if (
+      payload.causa_problemas_estudio &&
+      String(payload.causa_problemas_estudio).trim()
+    )
+      causas.push(String(payload.causa_problemas_estudio).trim());
+    payload.causa_problemas_estudio_compuesta = causas.length
+      ? causas.join("; ")
+      : null;
+
+    // Normalizar tipo de apoyo si se especificó 'OTRO'
+    if (payload.tipo_apoyo === "OTRO" && payload.tipo_apoyo_otro) {
+      payload.tipo_apoyo = payload.tipo_apoyo_otro;
+      delete payload.tipo_apoyo_otro;
+    }
+
+    // Asegurar honeypot y token CSRF en snake_case
+    payload.hp_email = payload.hp_email || payload.hpEmail || "";
+    payload.csrf_token =
+      document.getElementById("csrfToken")?.value ||
+      window.__csrfToken ||
+      payload.csrf_token ||
+      payload.csrfToken ||
+      "";
 
     console.log(
       "Enviando JSON estructurado a Backend:",
