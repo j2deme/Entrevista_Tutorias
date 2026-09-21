@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS `datos_escolares` (
   `localidad` VARCHAR(100) NOT NULL,
   `generacion_egreso` VARCHAR(20) NOT NULL,
   `promedio` DECIMAL(4,2) NOT NULL,
-  `rendimiento_escolar` ENUM('MUY BUENO','BUENO','REGULAR','MALO','MUY MALO') NOT NULL,
+  `rendimiento_escolar` ENUM('MUY_BUENO','BUENO','REGULAR','MALO','MUY_MALO') NOT NULL,
   `reprobado_curso` TINYINT(1) DEFAULT 0,
   `causa_reprobacion` TEXT DEFAULT NULL,
   `satisfecho_resultados` TINYINT(1) DEFAULT 1,
@@ -80,11 +80,14 @@ CREATE TABLE IF NOT EXISTS `datos_escolares` (
   `grado_beca` VARCHAR(50) DEFAULT NULL,
   `tipo_beca` VARCHAR(50) DEFAULT NULL,
   `materias_favoritas` TEXT DEFAULT NULL,
-  `reaccion_padres_calificaciones` ENUM('MUY BIEN','NORMAL','MUY MAL','NO SABEN') DEFAULT NULL,
+  `reaccion_padres_calificaciones` ENUM('MUY_BIEN','NORMAL','MUY_MAL','NO_SABEN') DEFAULT NULL,
   FOREIGN KEY (`estudiante_id`) REFERENCES `estudiantes`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Habilidades escolares
+-- Los valores del formulario llegan como códigos (B, N, M) y el backend los
+-- traduce a palabras ('Bueno','Normal','Malo') antes de insertar: ver
+-- habilidad_to_db() en public/index.php.
 CREATE TABLE IF NOT EXISTS `habilidades_escolares` (
   `estudiante_id` INT UNSIGNED NOT NULL PRIMARY KEY,
   `comprension_lectora` ENUM('Bueno','Normal','Malo') DEFAULT NULL,
@@ -154,13 +157,21 @@ ALTER TABLE `estudiantes`
   ADD CONSTRAINT `fk_estudiantes_tutor` FOREIGN KEY (`tutor_id`) REFERENCES `tutores`(`id`) ON DELETE SET NULL;
 
 -- Logs de envíos para protección contra spam (rate limiting)
+-- El índice (ip, created_at) respalda la consulta de ventana del rate limit.
 CREATE TABLE IF NOT EXISTS `submit_logs` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `ip` VARCHAR(45) NOT NULL,
-  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_ip_created` (`ip`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Configuración de la aplicación (activar/desactivar captura, ciclo)
+-- Configuración de la aplicación
+-- Claves conocidas:
+--   admin_password        -> contraseña admin (endpoints /api/admin/*)
+--   form_active           -> '1' habilita la captura, otro valor la cierra
+--   periodo               -> etiqueta del periodo de captura activo
+--   rate_limit_max        -> envíos máximos por IP en la ventana (defecto 5)
+--   rate_limit_window_min -> tamaño de la ventana en minutos (defecto 10)
 CREATE TABLE IF NOT EXISTS `app_settings` (
   `key` VARCHAR(100) NOT NULL PRIMARY KEY,
   `value` VARCHAR(255) DEFAULT NULL,
@@ -169,3 +180,54 @@ CREATE TABLE IF NOT EXISTS `app_settings` (
 
 -- Ejemplo: establecer contraseña admin (texto plano) para proteger endpoints admin
 -- INSERT INTO app_settings (`key`, `value`) VALUES ('admin_password', 'mi_contraseña_admin');
+
+-- Ejemplo: parámetros del rate limiting (si no existen, el backend usa 5 envíos / 10 min)
+-- INSERT INTO app_settings (`key`, `value`)
+--   VALUES ('rate_limit_max', '5'), ('rate_limit_window_min', '10')
+--   ON DUPLICATE KEY UPDATE `value` = `value`;
+
+-- ===========================================================================
+-- Ajustes para bases de datos que YA existían
+-- ===========================================================================
+-- Los CREATE TABLE de arriba usan IF NOT EXISTS, así que NO modifican tablas
+-- ya creadas. Este bloque deja la BD en el mismo estado que un alta nueva y es
+-- idempotente: puede ejecutarse cuantas veces se quiera, sobre una BD recién
+-- creada o sobre una que venía con el esquema anterior.
+
+-- 1) Enums de `datos_escolares`: valores con espacios -> snake_case, que es lo
+--    que envía public/form.html y lo que valida public/index.php (ver
+--    enums() en public/index.php).
+--    Se pasa por VARCHAR para no perder filas al redefinir el ENUM.
+ALTER TABLE `datos_escolares`
+  MODIFY COLUMN `rendimiento_escolar` VARCHAR(20) NOT NULL,
+  MODIFY COLUMN `reaccion_padres_calificaciones` VARCHAR(20) DEFAULT NULL;
+
+UPDATE `datos_escolares`
+   SET `rendimiento_escolar` = REPLACE(`rendimiento_escolar`, ' ', '_')
+ WHERE `rendimiento_escolar` IN ('MUY BUENO', 'MUY MALO');
+
+UPDATE `datos_escolares`
+   SET `reaccion_padres_calificaciones` = REPLACE(`reaccion_padres_calificaciones`, ' ', '_')
+ WHERE `reaccion_padres_calificaciones` IN ('MUY BIEN', 'MUY MAL', 'NO SABEN');
+
+ALTER TABLE `datos_escolares`
+  MODIFY COLUMN `rendimiento_escolar` ENUM('MUY_BUENO','BUENO','REGULAR','MALO','MUY_MALO') NOT NULL,
+  MODIFY COLUMN `reaccion_padres_calificaciones` ENUM('MUY_BIEN','NORMAL','MUY_MAL','NO_SABEN') DEFAULT NULL;
+
+-- 2) Índice que consulta el rate limiting en `submit_logs`. Se añade solo si
+--    falta, para no chocar con "Duplicate key name".
+--    Si el gestor no admite PREPARE, ejecuta a mano:
+--    ALTER TABLE `submit_logs` ADD INDEX `idx_ip_created` (`ip`, `created_at`);
+SET @idx_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.statistics
+  WHERE table_schema = DATABASE()
+    AND table_name   = 'submit_logs'
+    AND index_name   = 'idx_ip_created'
+);
+SET @ddl := IF(@idx_exists = 0,
+  'ALTER TABLE `submit_logs` ADD INDEX `idx_ip_created` (`ip`, `created_at`)',
+  'SELECT 1');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
