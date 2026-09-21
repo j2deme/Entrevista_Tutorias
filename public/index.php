@@ -14,15 +14,114 @@ use App\Models\DatosMedicos;
 use App\Models\ExpectativasIngreso;
 use Respect\Validation\Validator as v;
 
-// Valores permitidos (enums) — mantener sincronizados con db/mysql_entrevistas.sql
-$ENUM_GENERO              = ['F', 'M'];
-$ENUM_ESTADO_CIVIL        = ['SOLTERO', 'CASADO', 'UNION LIBRE', 'OTRO'];
-$ENUM_ZONA                = ['RURAL', 'URBANA'];
-$ENUM_TIPO_VIVIENDA       = ['PROPIA', 'RENTADA', 'PRESTADA', 'OTRA'];
-$ENUM_RENDIMIENTO         = ['MUY BUENO', 'BUENO', 'REGULAR', 'MALO', 'MUY MALO'];
-$ENUM_REACCION_PADRES     = ['MUY BIEN', 'NORMAL', 'MUY MAL', 'NO SABEN'];
-$ENUM_ESTUDIO_ES          = ['INTERESANTE', 'ABURRIDO', 'UTIL', 'IMPUESTO', 'PASATIEMPO', 'AMIGOS'];
-$ENUM_PREFERENCIA_TRABAJO = ['SOLO', 'COMPAÑERO', 'EQUIPO', 'IGUAL'];
+// Excepción para errores de negocio (se devuelven tal cual al cliente)
+class FormException extends \Exception
+{
+}
+
+// --- Catálogo de valores permitidos (enums) -------------------------------
+// Fuente única de verdad en PHP. Mantener sincronizado con
+// db/mysql_entrevistas.sql y validar siempre con enum_value().
+function enums(string $key): array
+{
+  static $catalog = [
+    'genero'              => ['F', 'M', 'NB'],
+    'estado_civil'        => ['SOLTERO', 'CASADO', 'UNION LIBRE', 'DIVORCIADO', 'VIUDO', 'OTRO'],
+    'zona'                => ['RURAL', 'URBANA'],
+    'tipo_vivienda'       => ['PROPIA', 'RENTADA', 'PRESTADA', 'OTRA'],
+    'rendimiento_escolar' => ['MUY_BUENO', 'BUENO', 'REGULAR', 'MALO', 'MUY_MALO'],
+    'reaccion_padres'     => ['MUY_BIEN', 'NORMAL', 'MUY_MAL', 'NO_SABEN'],
+    'estudio_es'          => ['INTERESANTE', 'ABURRIDO', 'UTIL', 'IMPUESTO', 'PASATIEMPO', 'AMIGOS'],
+    'preferencia_trabajo' => ['SOLO', 'COMPAÑERO', 'EQUIPO', 'IGUAL'],
+    'relacion_padres'     => ['MUY_BUENA', 'BUENA', 'REGULAR', 'MALA', 'MUY_MALA'],
+    'habilidades'         => ['B', 'N', 'M', 'BUENO', 'NORMAL', 'MALO'],
+  ];
+  return $catalog[$key] ?? [];
+}
+
+// Normaliza un valor enum (mayúsculas, espacio <-> guion bajo, sin acentos)
+// y devuelve la variante canónica del catálogo; null si no está permitido.
+// Ej.: 'MUY BUENO' y 'MUY_BUENO' => 'MUY_BUENO'; 'COMPANERO' => 'COMPAÑERO'.
+function enum_value($raw, array $allowed): ?string
+{
+  if ($raw === null || trim((string) $raw) === '')
+    return null;
+  $fold = static function ($s): string {
+    $s = strtoupper((string) $s);
+    $s = strtr($s, ['Ñ' => 'N', 'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U', 'Ü' => 'U']);
+    return str_replace([' ', '-'], '_', $s);
+  };
+  $candidate = $fold($raw);
+  foreach ($allowed as $option) {
+    if ($fold($option) === $candidate)
+      return $option;
+  }
+  return null;
+}
+
+// Valida un valor enum presente y lo reemplaza por su forma canónica.
+// Los vacíos no generan error aquí: se cubren con la lista de requeridos.
+// Las claves de $errors usan snake_case para coincidir con los name= del formulario.
+function enum_or_error(array &$errors, string $field, &$raw, array $allowed, string $label): void
+{
+  if ($raw === null || trim((string) $raw) === '')
+    return;
+  $normalized = enum_value($raw, $allowed);
+  if ($normalized === null) {
+    $errors[$field] = $label . ': valor no permitido';
+    return;
+  }
+  $raw = $normalized;
+}
+
+// Campos de habilidades escolares tal como llegan del formulario (planos)
+function habilidad_fields(): array
+{
+  return [
+    'comprension_lectora', 'comprension_oral', 'resolucion_problemas',
+    'expresion_oral', 'expresion_escrita', 'vocabulario', 'calculo',
+    'expresion_grafica', 'ortografia',
+  ];
+}
+
+// El formulario envía códigos (B/N/M); la tabla habilidades_escolares
+// almacena palabras ('Bueno','Normal','Malo'). Ver db/mysql_entrevistas.sql.
+function habilidad_to_db($value): ?string
+{
+  if ($value === null || trim((string) $value) === '')
+    return null;
+  $map = ['B' => 'Bueno', 'N' => 'Normal', 'M' => 'Malo',
+    'BUENO' => 'Bueno', 'NORMAL' => 'Normal', 'MALO' => 'Malo'];
+  return $map[strtoupper(trim((string) $value))] ?? null;
+}
+
+// Fusiona el campo libre "..._otro/otra" en su select cuando se eligió la
+// opción genérica (OTRA/OTRO/OTROS), para no perder la descripción.
+function merge_otro(&$target, string $genericCode, $freeText): void
+{
+  if (is_string($target) && $target === $genericCode
+    && is_string($freeText) && trim($freeText) !== '') {
+    $target = trim($freeText);
+  }
+}
+
+// Un input numérico vacío llega como '' (y los Sí/No como true/false):
+// sin esta conversión, insertar '' en una columna INT/DECIMAL rompe el guardado.
+function int_or_null($v): ?int
+{
+  if (is_bool($v))
+    return (int) $v;
+  if ($v === null || $v === '' || is_array($v))
+    return null;
+  return is_numeric($v) ? (int) $v : null;
+}
+
+function num_or_null($v)
+{
+  if ($v === null || $v === '' || is_array($v) || is_bool($v))
+    return is_bool($v) ? (int) $v : null;
+  return is_numeric($v) ? $v + 0 : null;
+}
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -53,15 +152,12 @@ $capsule->bootEloquent();
 
 $app = AppFactory::create();
 
-// Helper simple para verificar contraseña admin almacenada en app_settings
+// Helper simple para verificar contraseña admin almacenada en app_settings.
+// Solo se acepta el header X-Admin-Password: nunca por query string, porque
+// quedaría registrado en logs de servidor, historial del navegador y referers.
 function check_admin(Request $request)
 {
-  // Preferir header X-Admin-Password, si no usar query param admin_password
-  $sent = $request->getHeaderLine('X-Admin-Password');
-  if (empty($sent)) {
-    $qp   = $request->getQueryParams();
-    $sent = $qp['admin_password'] ?? null;
-  }
+  $sent   = $request->getHeaderLine('X-Admin-Password');
   $stored = Capsule::table('app_settings')->where('key', 'admin_password')->value('value');
   if (empty($stored) || empty($sent))
     return false;
@@ -141,13 +237,11 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
     'padreNombre' => $in['padre_nombre'] ?? null,
     'padreVive' => $in['padre_vive'] ?? null,
     'padreEdad' => $in['padre_edad'] ?? null,
-    'padreProfesion' => $in['padre_profesion'] ?? null,
     'padreNivelEstudios' => $in['padre_nivel_estudios'] ?? ($in['padreNivelEstudios'] ?? null),
     'padreOcupacion' => $in['padre_ocupacion'] ?? ($in['padreOcupacion'] ?? null),
     'madreNombre' => $in['madre_nombre'] ?? null,
     'madreVive' => $in['madre_vive'] ?? null,
     'madreEdad' => $in['madre_edad'] ?? null,
-    'madreProfesion' => $in['madre_profesion'] ?? null,
     'madreNivelEstudios' => $in['madre_nivel_estudios'] ?? ($in['madreNivelEstudios'] ?? null),
     'madreOcupacion' => $in['madre_ocupacion'] ?? ($in['madreOcupacion'] ?? null),
     'numIntegrantesFamilia' => $in['num_integrantes_familia'] ?? ($in['numIntegrantesFamilia'] ?? null),
@@ -180,7 +274,8 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
     'tipoBeca' => $in['tipo_beca'] ?? ($in['tipoBeca'] ?? null),
     'materiasFavoritas' => $in['materias_favoritas'] ?? ($in['materiasFavoritas'] ?? null),
     'reaccionPadresCalificaciones' => $in['reaccion_padres_calificaciones'] ?? ($in['reaccionPadresCalificaciones'] ?? null),
-    'habilidades' => $in['habilidades'] ?? []
+    // Se completa más abajo: acepta payload plano, anidado o con prefijo hab_
+    'habilidades' => []
   ];
 
   $dm = [
@@ -220,6 +315,30 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
     'prio_otra' => $in['prio_otra'] ?? null
   ];
 
+  // Habilidades: el formulario envía claves planas (comprension_lectora, ...).
+  // También se acepta el formato anidado `habilidades: {...}` y el prefijo `hab_*`.
+  $habIn  = is_array($in['habilidades'] ?? null) ? $in['habilidades'] : [];
+  foreach (habilidad_fields() as $hf) {
+    $raw = $habIn[$hf] ?? $in['hab_' . $hf] ?? $in[$hf] ?? null;
+    if (is_scalar($raw) && (string) $raw !== '')
+      $de['habilidades'][$hf] = $raw;
+  }
+
+  // Fusionar los campos libres "..._otro/otra" cuando se eligió la opción
+  // genérica, para no guardar el código vacío sin la descripción.
+  // (El cliente ya hace lo mismo; aquí queda cubierta también la API directa.)
+  merge_otro($df['vivesCon'], 'OTROS', $in['vives_con_otro'] ?? null);
+  merge_otro($de['tipoBeca'], 'OTRA', $in['tipo_beca_otro'] ?? null);
+  merge_otro($dm['cualEnfermedad'], 'OTRA', $in['cual_enfermedad_otro'] ?? null);
+  merge_otro($dm['cualCondicion'], 'OTRA', $in['cual_condicion_otro'] ?? null);
+  merge_otro($ei['tipoApoyo'], 'OTRO', $in['tipo_apoyo_otro'] ?? null);
+
+  // Transporte público: si no aplica, no deben quedar registrado tiempo ni costo
+  $usaTransporte  = !empty($in['usa_transporte_publico']);
+  $tiempoTraslado = $usaTransporte ? ($in['tiempo_traslado_transporte'] ?? null) : null;
+  $costoRaw       = $in['costo_transporte'] ?? null;
+  $costoTraslado  = ($usaTransporte && $costoRaw !== '' && $costoRaw !== null) ? num_or_null($costoRaw) : null;
+
   // Normalizar número de control: trim, eliminar espacios internos y uppercase
   $nc_raw  = $dp['numeroControl'] ?? $input['numeroControl'] ?? null;
   $nc_norm = null;
@@ -253,35 +372,51 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
     return $response->withHeader('Content-Type', 'application/json')->withStatus(423);
   }
 
+  // --- Rate limiting por IP -------------------------------------------
+  // Cada intento que pasa honeypot + CSRF queda registrado en submit_logs y
+  // se rechaza si supera el máximo configurable de la ventana (app_settings:
+  // rate_limit_max, por defecto 5 envíos; rate_limit_window_min, por defecto 10 min).
+  $ip            = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+  $rateMax       = (int) (Capsule::table('app_settings')->where('key', 'rate_limit_max')->value('value') ?: 5);
+  $rateWindowMin = (int) (Capsule::table('app_settings')->where('key', 'rate_limit_window_min')->value('value') ?: 10);
+  $since         = date('Y-m-d H:i:s', time() - max(1, $rateWindowMin) * 60);
+  $recent        = Capsule::table('submit_logs')->where('ip', $ip)->where('created_at', '>=', $since)->count();
+  if ($recent >= max(1, $rateMax)) {
+    $response->getBody()->write(json_encode(['error' => 'Demasiados envíos desde esta conexión. Intenta de nuevo más tarde.']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(429);
+  }
+  Capsule::table('submit_logs')->insert(['ip' => $ip]);
 
-
-  // Campos requeridos mínimos según entrevistas.sql
+  // Campos requeridos mínimos. Las claves usan snake_case para coincidir con
+  // los name= del formulario y poder resaltar el campo con error.
   $required = [
     // El número de control es obligatorio; el prefijo B/C es opcional
-    'numeroControl' => $dp['numeroControl'] ?? $input['numeroControl'] ?? null,
-    'nombreCompleto' => $dp['nombreCompleto'] ?? $input['nombreCompleto'] ?? null,
-    'fechaNacimiento' => $dp['fechaNacimiento'] ?? $input['fechaNacimiento'] ?? null,
-    'lugarNacimiento' => $dp['lugarNacimiento'] ?? $input['lugarNacimiento'] ?? null,
-    'domicilioFamiliar' => $dp['domicilioFamiliar'] ?? $input['domicilioFamiliar'] ?? null,
-    'localidadFamiliar' => $dp['localidadFamiliar'] ?? $input['localidadFamiliar'] ?? null,
-    'codigoPostal' => $dp['codigoPostal'] ?? $input['codigoPostal'] ?? null,
-    'zona' => $dp['zona'] ?? $input['zona'] ?? null,
-    'tipoVivienda' => $dp['tipoVivienda'] ?? $input['tipoVivienda'] ?? null,
-    'telefonoMovil' => $dp['telefonoMovil'] ?? $input['telefonoMovil'] ?? null,
+    'numero_control' => $dp['numeroControl'],
+    'nombre_completo' => $dp['nombreCompleto'],
+    'fecha_nacimiento' => $dp['fechaNacimiento'],
+    'lugar_nacimiento' => $dp['lugarNacimiento'],
+    'domicilio_familiar' => $dp['domicilioFamiliar'],
+    'localidad_familiar' => $dp['localidadFamiliar'],
+    'codigo_postal' => $dp['codigoPostal'],
+    'genero' => $dp['genero'],
+    'estado_civil' => $dp['estadoCivil'],
+    'zona' => $dp['zona'],
+    'tipo_vivienda' => $dp['tipoVivienda'],
+    'telefono_movil' => $dp['telefonoMovil'],
     // Tutor asignado (obligatorio para filtrar registros posteriormente)
-    'tutorId' => $dp['tutorId'] ?? $input['tutorId'] ?? null,
+    'tutor_id' => $dp['tutorId'],
     // Familiares
-    'numIntegrantesFamilia' => $df['numIntegrantesFamilia'] ?? $input['numIntegrantesFamilia'] ?? null,
-    'numHermanos' => $df['numHermanos'] ?? $input['numHermanos'] ?? null,
-    'lugarQueOcupa' => $df['lugarQueOcupa'] ?? $input['lugarQueOcupa'] ?? null,
-    'vivesCon' => $df['vivesCon'] ?? $input['vivesCon'] ?? null,
+    'num_integrantes_familia' => $df['numIntegrantesFamilia'],
+    'num_hermanos' => $df['numHermanos'],
+    'lugar_que_ocupa' => $df['lugarQueOcupa'],
+    'vives_con' => $df['vivesCon'],
     // Escolares
-    'institucionProcedencia' => $de['institucionProcedencia'] ?? $input['institucionProcedencia'] ?? null,
-    'localidadEscuela' => $de['localidad'] ?? $input['localidadEscuela'] ?? null,
-    'generacionEgreso' => $de['generacionEgreso'] ?? $input['generacionEgreso'] ?? null,
-    'promedio' => $de['promedio'] ?? $input['promedio'] ?? null,
-    'rendimientoEscolar' => $de['rendimientoEscolar'] ?? $input['rendimientoEscolar'] ?? null,
-    'reaccionPadresCalificaciones' => $de['reaccionPadresCalificaciones'] ?? $input['reaccionPadresCalificaciones'] ?? null
+    'institucion_procedencia' => $de['institucionProcedencia'],
+    'localidad_escuela' => $de['localidad'],
+    'generacion_egreso' => $de['generacionEgreso'],
+    'promedio' => $de['promedio'],
+    'rendimiento_escolar' => $de['rendimientoEscolar'],
+    'reaccion_padres_calificaciones' => $de['reaccionPadresCalificaciones']
   ];
 
   $missing = [];
@@ -295,121 +430,84 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
   }
 
   // Verificar que el tutor enviado exista y esté activo
-  $tutorIdCheck = isset($dp['tutorId']) ? intval($dp['tutorId']) : (isset($input['tutorId']) ? intval($input['tutorId']) : null);
+  $tutorIdCheck = isset($dp['tutorId']) ? intval($dp['tutorId']) : null;
   if (empty($tutorIdCheck) || !Capsule::table('tutores')->where('id', $tutorIdCheck)->where('active', 1)->exists()) {
-    $response->getBody()->write(json_encode(['error' => 'Tutor inválido o inactivo', 'fields' => ['tutorId' => 'Tutor inválido o inactivo']]));
+    $response->getBody()->write(json_encode(['error' => 'Tutor inválido o inactivo', 'fields' => ['tutor_id' => 'Tutor inválido o inactivo']]));
     return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
   }
 
-  // Validaciones con Respect/Validation
+  // Validaciones con Respect/Validation. Claves en snake_case (name= del form).
   $errors = [];
   // nombre
   try {
     v::stringType()->notEmpty()->length(1, 150)->assert($dp['nombreCompleto'] ?? '');
   } catch (\Throwable $e) {
-    $errors['nombreCompleto'] = $e->getMessage();
+    $errors['nombre_completo'] = 'Nombre completo inválido';
   }
   // fecha
   try {
     v::date('Y-m-d')->assert($dp['fechaNacimiento'] ?? '');
   } catch (\Throwable $e) {
-    $errors['fechaNacimiento'] = $e->getMessage();
+    $errors['fecha_nacimiento'] = 'Fecha de nacimiento inválida (formato Y-m-d)';
   }
   // telefono
   try {
-    v::digit()->length(7, 15)->assert(preg_replace('/\D/', '', $dp['telefonoMovil'] ?? ''));
+    v::digit()->length(7, 15)->assert(preg_replace('/\D/', '', (string) ($dp['telefonoMovil'] ?? '')));
   } catch (\Throwable $e) {
-    $errors['telefonoMovil'] = $e->getMessage();
+    $errors['telefono_movil'] = 'Teléfono inválido (debe tener entre 7 y 15 dígitos)';
   }
-  // Enums: validar opciones contra listas permitidas
-  $allowedGenero       = ['F', 'M', 'NB'];
-  $allowedEstadoCivil  = ['SOLTERO', 'CASADO', 'UNION LIBRE', 'DIVORCIADO', 'VIUDO', 'OTRO'];
-  $allowedZona         = ['RURAL', 'URBANA'];
-  $allowedTipoVivienda = ['PROPIA', 'RENTADA', 'PRESTADA', 'OTRA'];
-  try {
-    v::in($allowedGenero)->assert(strtoupper($dp['genero'] ?? ''));
-  } catch (\Throwable $e) {
-    $errors['genero'] = 'Valor inválido para género';
-  }
-  try {
-    v::in($allowedEstadoCivil)->assert(strtoupper($dp['estadoCivil'] ?? ''));
-  } catch (\Throwable $e) {
-    $errors['estadoCivil'] = 'Valor inválido para estado civil';
-  }
-  try {
-    v::in($allowedZona)->assert(strtoupper($dp['zona'] ?? ''));
-  } catch (\Throwable $e) {
-    $errors['zona'] = 'Valor inválido para zona';
-  }
-  try {
-    v::in($allowedTipoVivienda)->assert(strtoupper($dp['tipoVivienda'] ?? ''));
-  } catch (\Throwable $e) {
-    $errors['tipoVivienda'] = 'Valor inválido para tipo de vivienda';
-  }
+  // Enums: validar y dejar la forma canónica del catálogo. Se aceptan tanto
+  // 'MUY BUENO' como 'MUY_BUENO'; en la BD siempre se guarda el canónico.
+  enum_or_error($errors, 'genero', $dp['genero'], enums('genero'), 'Género');
+  enum_or_error($errors, 'estado_civil', $dp['estadoCivil'], enums('estado_civil'), 'Estado civil');
+  enum_or_error($errors, 'zona', $dp['zona'], enums('zona'), 'Zona');
+  enum_or_error($errors, 'tipo_vivienda', $dp['tipoVivienda'], enums('tipo_vivienda'), 'Tipo de vivienda');
+  enum_or_error($errors, 'rendimiento_escolar', $de['rendimientoEscolar'], enums('rendimiento_escolar'), 'Rendimiento escolar');
+  enum_or_error($errors, 'reaccion_padres_calificaciones', $de['reaccionPadresCalificaciones'], enums('reaccion_padres'), 'Reacción ante las calificaciones');
+  enum_or_error($errors, 'estudio_es', $ei['estudioEs'], enums('estudio_es'), 'Para ti estudiar es');
   // numero de control (obligatorio). El prefijo [B|C] es opcional: [B|C]?YY69####
   if (empty($dp['numeroControl'])) {
-    $errors['numeroControl'] = 'Número de control requerido';
-  } else {
-    try {
-      v::regex('/^(?:[BC])?\d{2}69\d{4}$/i')->assert($dp['numeroControl']);
-    } catch (\Throwable $e) {
-      $errors['numeroControl'] = 'Formato inválido de número de control';
-    }
-  }
-  // datos escolares: rendimiento y reaccion de padres deben corresponder a enums
-  $allowedRend     = ['MUY BUENO', 'BUENO', 'REGULAR', 'MALO', 'MUY MALO'];
-  $allowedReaccion = ['MUY BIEN', 'NORMAL', 'MUY MAL', 'NO SABEN'];
-  try {
-    v::in($allowedRend)->assert(strtoupper($de['rendimientoEscolar'] ?? ''));
-  } catch (\Throwable $e) {
-    $errors['rendimientoEscolar'] = 'Valor inválido para rendimiento escolar';
-  }
-  try {
-    v::in($allowedReaccion)->assert(strtoupper($de['reaccionPadresCalificaciones'] ?? ''));
-  } catch (\Throwable $e) {
-    $errors['reaccionPadresCalificaciones'] = 'Valor inválido para reacción de padres';
+    $errors['numero_control'] = 'Número de control requerido';
+  } elseif (!preg_match('/^(?:[BC])?\d{2}69\d{4}$/i', (string) $dp['numeroControl'])) {
+    $errors['numero_control'] = 'Formato inválido de número de control';
   }
   // Promedio: validar rango numérico (0-10)
-  try {
-    v::numericVal()->between(0, 10)->assert(isset($de['promedio']) ? $de['promedio'] : null);
-  } catch (\Throwable $e) {
-    $errors['promedio'] = 'Promedio inválido (debe ser numérico entre 0 y 10)';
+  if ($de['promedio'] !== null && $de['promedio'] !== '') {
+    try {
+      v::numericVal()->between(0, 10)->assert($de['promedio']);
+    } catch (\Throwable $e) {
+      $errors['promedio'] = 'Promedio inválido (debe ser numérico entre 0 y 10)';
+    }
   }
-  // Expectativas: estudio_es enum
-  $allowedEstudioEs = ['INTERESANTE', 'ABURRIDO', 'UTIL', 'IMPUESTO', 'PASATIEMPO', 'AMIGOS'];
-  try {
-    v::in($allowedEstudioEs)->assert(strtoupper($ei['estudioEs'] ?? ''));
-  } catch (\Throwable $e) {
-    $errors['estudioEs'] = 'Valor inválido para "Para ti el estudio es"';
-  }
-  // Habilidades: valores deben ser B, N o M
-  $habAllowed = ['B', 'N', 'M'];
-  $habKeys    = ['comprensionLectora', 'comprensionOral', 'resolucionProblemas', 'expresionOral', 'expresionEscrita', 'vocabulario', 'calculo', 'expresionGrafica', 'ortografia'];
-  foreach ($habKeys as $hk) {
-    $val = $de['habilidades'][$hk] ?? ($de['hab_' . $hk] ?? null);
-    if ($val !== null && $val !== '') {
-      try {
-        v::in($habAllowed)->assert(strtoupper($val));
-      } catch (\Throwable $e) {
-        $errors['hab_' . $hk] = 'Valor inválido para ' . $hk;
-      }
+  // Preferencia de trabajo: mapear variantes al valor canónico del ENUM
+  $prefRaw = $ei['preferenciaEnClase'] ?? ($ei['preferenciaTrabajo'] ?? null);
+  if (is_string($prefRaw) && strcasecmp($prefRaw, 'ME_DA_IGUAL') === 0)
+    $prefRaw = 'IGUAL';
+  $prefNorm = enum_value($prefRaw, enums('preferencia_trabajo'));
+  if (trim((string) $prefRaw) !== '' && $prefNorm === null)
+    $errors['preferencia_trabajo'] = 'Valor inválido para preferencia de trabajo';
+  $ei['preferenciaTrabajo'] = $prefNorm;
+  unset($ei['preferenciaEnClase']);
+  // Habilidades: valores B, N o M (o su forma larga Bueno/Normal/Malo)
+  foreach (habilidad_fields() as $hf) {
+    if (!isset($de['habilidades'][$hf]))
+      continue;
+    $norm = enum_value($de['habilidades'][$hf], enums('habilidades'));
+    if ($norm === null) {
+      unset($de['habilidades'][$hf]);
+      $errors[$hf] = 'Valor inválido (usa B, N o M)';
+    } else {
+      $de['habilidades'][$hf] = $norm;
     }
   }
   if (!empty($errors)) {
     $response->getBody()->write(json_encode(['error' => 'Errores de validación', 'fields' => $errors]));
     return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
   }
-  if (!empty($missing)) {
-    $response->getBody()->write(json_encode(['error' => 'Faltan campos requeridos', 'missing' => $missing]));
-    return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
-  }
 
   try {
-    // Capturar IP para auditoría
-    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-
     // Guardar todo en transacción (crear o actualizar preregistro existente)
-    Capsule::connection()->transaction(function () use ($dp, $df, $de, $dm, $ei, &$response, $ip, $in) {
+    Capsule::connection()->transaction(function () use ($dp, $df, $de, $dm, $ei, &$response, $in, $usaTransporte, $tiempoTraslado, $costoTraslado) {
       // Leer periodo de captura activo (opcional)
       $capturePeriod = Capsule::table('app_settings')->where('key', 'periodo')->value('value');
 
@@ -422,12 +520,12 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
       if ($existing) {
         // Si ya fue capturado, no permitir reescribir
         if (!empty($existing->capturado)) {
-          throw new \Exception('Número de control ya registrado');
+          throw new FormException('Número de control ya registrado');
         }
         // Si existe y pertenece a otro tutor distinto, rechazar para evitar reasignaciones accidentales
         $incomingTutor = isset($dp['tutorId']) ? intval($dp['tutorId']) : null;
         if (!empty($existing->tutor_id) && $incomingTutor && $existing->tutor_id !== $incomingTutor) {
-          throw new \Exception('Número de control asignado a otro tutor');
+          throw new FormException('Número de control asignado a otro tutor');
         }
 
         // Actualizar el preregistro con los datos enviados y marcar capturado
@@ -447,9 +545,9 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
           'telefono_movil' => $dp['telefonoMovil'] ?? $existing->telefono_movil,
           'habla_otra_lengua' => !empty($dp['hablaOtraLengua']) ? 1 : $existing->habla_otra_lengua,
           'cual_lengua' => $dp['cualLengua'] ?? $existing->cual_lengua,
-          'usa_transporte_publico' => !empty($in['usa_transporte_publico']) ? 1 : $existing->usa_transporte_publico,
-          'tiempo_traslado_transporte' => $in['tiempo_traslado_transporte'] ?? $existing->tiempo_traslado_transporte,
-          'costo_transporte' => isset($in['costo_transporte']) ? $in['costo_transporte'] : $existing->costo_transporte,
+          'usa_transporte_publico' => $usaTransporte ? 1 : 0,
+          'tiempo_traslado_transporte' => $usaTransporte ? ($tiempoTraslado ?? $existing->tiempo_traslado_transporte) : null,
+          'costo_transporte' => $usaTransporte ? ($costoTraslado ?? $existing->costo_transporte) : null,
           'tutor_id' => isset($dp['tutorId']) ? intval($dp['tutorId']) : $existing->tutor_id,
           'periodo_captura' => $capturePeriod ?? $existing->periodo_captura,
           'capturado' => 1
@@ -476,9 +574,9 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
           'telefono_movil' => $dp['telefonoMovil'] ?? null,
           'habla_otra_lengua' => !empty($dp['hablaOtraLengua']) ? 1 : 0,
           'cual_lengua' => $dp['cualLengua'] ?? null,
-          'usa_transporte_publico' => !empty($in['usa_transporte_publico']) ? 1 : 0,
-          'tiempo_traslado_transporte' => $in['tiempo_traslado_transporte'] ?? null,
-          'costo_transporte' => isset($in['costo_transporte']) ? $in['costo_transporte'] : null,
+          'usa_transporte_publico' => $usaTransporte ? 1 : 0,
+          'tiempo_traslado_transporte' => $tiempoTraslado,
+          'costo_transporte' => $costoTraslado,
           'periodo_captura' => $capturePeriod ?? null,
           'capturado' => 1
         ]);
@@ -488,27 +586,27 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
       DatosFamiliares::updateOrCreate(['estudiante_id' => $estudiante->id], [
         'padre_nombre' => $df['padreNombre'] ?? null,
         'padre_vive' => !empty($df['padreVive']) ? 1 : 0,
-        'padre_edad' => $df['padreEdad'] ?? null,
+        'padre_edad' => int_or_null($df['padreEdad']),
         'padre_nivel_estudios' => $df['padreNivelEstudios'] ?? null,
         'padre_ocupacion' => $df['padreOcupacion'] ?? null,
         'madre_nombre' => $df['madreNombre'] ?? null,
         'madre_vive' => !empty($df['madreVive']) ? 1 : 0,
-        'madre_edad' => $df['madreEdad'] ?? null,
+        'madre_edad' => int_or_null($df['madreEdad']),
         'madre_nivel_estudios' => $df['madreNivelEstudios'] ?? null,
         'madre_ocupacion' => $df['madreOcupacion'] ?? null,
-        'num_integrantes_familia' => $df['numIntegrantesFamilia'] ?? null,
-        'num_hermanos' => $df['numHermanos'] ?? null,
-        'lugar_que_ocupa' => $df['lugarQueOcupa'] ?? null,
+        'num_integrantes_familia' => int_or_null($df['numIntegrantesFamilia']),
+        'num_hermanos' => int_or_null($df['numHermanos']),
+        'lugar_que_ocupa' => int_or_null($df['lugarQueOcupa']),
         'vives_con' => $df['vivesCon'] ?? null,
         'situacion_especial' => $df['situacionEspecial'] ?? null,
         'relacion_padres' => $df['relacionPadres'] ?? null,
         'trabaja_actualmente' => !empty($df['trabajaActualmente']) ? 1 : 0,
-        'horas_trabajo' => $df['horasTrabajo'] ?? null,
+        'horas_trabajo' => int_or_null($df['horasTrabajo']),
         'empresa_trabajo' => $df['empresaTrabajo'] ?? null,
         'motivo_trabajo' => $df['motivoTrabajo'] ?? null,
         'tiempo_traslado_escuela' => $df['tiempoTrasladoEscuela'] ?? null,
         'apoyo_economico' => $df['apoyoEconomico'] ?? null,
-        'ingreso_mensual_familiar' => $df['ingresoMensualFamiliar'] ?? null
+        'ingreso_mensual_familiar' => num_or_null($df['ingresoMensualFamiliar'])
       ]);
 
       // Datos escolares
@@ -529,18 +627,12 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
         'reaccion_padres_calificaciones' => $de['reaccionPadresCalificaciones'] ?? null
       ]);
 
-      // Habilidades
-      HabilidadesEscolares::updateOrCreate(['estudiante_id' => $estudiante->id], [
-        'comprension_lectora' => $de['habilidades']['comprensionLectora'] ?? ($de['hab_comprensionLectora'] ?? null),
-        'comprension_oral' => $de['habilidades']['comprensionOral'] ?? ($de['hab_comprensionOral'] ?? null),
-        'resolucion_problemas' => $de['habilidades']['resolucionProblemas'] ?? ($de['hab_resolucionProblemas'] ?? null),
-        'expresion_oral' => $de['habilidades']['expresionOral'] ?? ($de['hab_expresionOral'] ?? null),
-        'expresion_escrita' => $de['habilidades']['expresionEscrita'] ?? ($de['hab_expresionEscrita'] ?? null),
-        'vocabulario' => $de['habilidades']['vocabulario'] ?? ($de['hab_vocabulario'] ?? null),
-        'calculo' => $de['habilidades']['calculo'] ?? ($de['hab_calculo'] ?? null),
-        'expresion_grafica' => $de['habilidades']['expresionGrafica'] ?? ($de['hab_expresionGrafica'] ?? null),
-        'ortografia' => $de['habilidades']['ortografia'] ?? ($de['hab_ortografia'] ?? null)
-      ]);
+      // Habilidades (el formulario envía B/N/M; la BD almacena Bueno/Normal/Malo)
+      $habRow = [];
+      foreach (habilidad_fields() as $hf) {
+        $habRow[$hf] = habilidad_to_db($de['habilidades'][$hf] ?? null);
+      }
+      HabilidadesEscolares::updateOrCreate(['estudiante_id' => $estudiante->id], $habRow);
 
       // Datos medicos
       DatosMedicos::updateOrCreate(['estudiante_id' => $estudiante->id], [
@@ -566,50 +658,41 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
         'tipo_apoyo' => $ei['tipoApoyo'] ?? null,
         'pasatiempo_favorito' => $ei['pasatiempoFavorito'] ?? null,
         'causa_problemas_estudio' => $ei['causaProblemasEstudio'] ?? null,
-        'preferencia_trabajo' => (function ($v) {
-          if (empty($v))
-            return null;
-          $map = [
-            'ME_DA_IGUAL' => 'IGUAL',
-            'IGUAL' => 'IGUAL',
-            'COMPANERO' => 'COMPAÑERO',
-            'COMPAÑERO' => 'COMPAÑERO',
-            'SOLO' => 'SOLO',
-            'EQUIPO' => 'EQUIPO'
-          ];
-          $vk  = strtoupper(str_replace(' ', '_', (string) $v));
-          return $map[$vk] ?? null;
-        })($ei['preferenciaEnClase'] ?? ($ei['preferenciaTrabajo'] ?? null)),
+        'preferencia_trabajo' => $ei['preferenciaTrabajo'] ?? null,
         'tiempo_estudio_casa' => $ei['tiempoEstudioCasa'] ?? null,
         'forma_pasartiempo' => $ei['formaPasarTiempo'] ?? null,
         'forma_hacer_amigos' => $ei['formaHacerAmigos'] ?? null,
         'cuenta_lugar_adecuado' => !empty($ei['cuentaLugarAdecuado']) ? 1 : 0,
-        'prio_explicacion_clara' => $ei['prioridadesProfesor']['explicacionClara'] ?? ($ei['prio_explicacionClara'] ?? null),
-        'prio_entienda_jovenes' => $ei['prioridadesProfesor']['entiendaJovenes'] ?? ($ei['prio_entiendaJovenes'] ?? null),
-        'prio_justo_evaluar' => $ei['prioridadesProfesor']['justoEvaluar'] ?? ($ei['prio_justoEvaluar'] ?? null),
-        'prio_permita_preguntar' => $ei['prioridadesProfesor']['permitaPreguntar'] ?? ($ei['prio_permitaPreguntar'] ?? null),
-        'prio_respete_e_imponga' => $ei['prioridadesProfesor']['respeteEImponga'] ?? ($ei['prio_respeteEImponga'] ?? null),
-        'prio_no_se_enoje' => $ei['prioridadesProfesor']['noSeEnoje'] ?? ($ei['prio_noSeEnoje'] ?? null),
+        'prio_explicacion_clara' => int_or_null($ei['prio_explicacionClara'] ?? null),
+        'prio_entienda_jovenes' => int_or_null($ei['prio_entiendaJovenes'] ?? null),
+        'prio_justo_evaluar' => int_or_null($ei['prio_justoEvaluar'] ?? null),
+        'prio_permita_preguntar' => int_or_null($ei['prio_permitaPreguntar'] ?? null),
+        'prio_respete_e_imponga' => int_or_null($ei['prio_respeteEImponga'] ?? null),
+        'prio_no_se_enoje' => int_or_null($ei['prio_noSeEnoje'] ?? null),
         'prio_otra' => $ei['prio_otra'] ?? null
       ]);
 
-      // Set response data
-      // Registrar intento exitoso en submit_logs
-      Capsule::table('submit_logs')->insert(['ip' => $ip]);
+      // El intento ya quedó registrado en submit_logs (rate limiting)
 
       $response->getBody()->write(json_encode(['status' => 'success', 'id' => $estudiante->id]));
     });
 
     return $response->withHeader('Content-Type', 'application/json')->withStatus(201);
+  } catch (FormException $e) {
+    // Error de negocio esperado: se devuelve tal cual (409 = conflicto)
+    $response->getBody()->write(json_encode(['error' => $e->getMessage()]));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(409);
   } catch (\Exception $e) {
-    $response->getBody()->write(json_encode(['error' => 'Error al guardar: ' . $e->getMessage()]));
+    // No exponer el detalle interno (puede revelar estructura de la BD)
+    error_log('[entrevistas] POST /api/estudiantes: ' . $e->getMessage());
+    $response->getBody()->write(json_encode(['error' => 'No se pudo guardar el registro. Intenta de nuevo.']));
     return $response->withHeader('Content-Type', 'application/json')->withStatus(500);
   }
 });
 
 
 // RUTA: Verificar existencia de número de control (antes de mostrar formulario)
-$app->get('/api/estudiantes/check', function (Request $request, Response $response) use ($ENUM_GENERO) {
+$app->get('/api/estudiantes/check', function (Request $request, Response $response) {
   $q  = $request->getQueryParams();
   $nc = strtoupper(str_replace(' ', '', trim((string) ($q['numeroControl'] ?? ''))));
   if (empty($nc)) {
@@ -634,26 +717,35 @@ $app->get('/api/estudiantes/check', function (Request $request, Response $respon
   return $response->withHeader('Content-Type', 'application/json');
 });
 
-// Exportar estudiantes (registros guardados con payload JSON)
+// Exportar estudiantes a Excel (contiene datos personales: solo admin)
 $app->get('/api/estudiantes/exportar', function (Request $request, Response $response) {
-  $estudiantes = Estudiante::all();
+  if (!check_admin($request)) {
+    $response->getBody()->write(json_encode(['error' => 'Autenticación admin requerida']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
+  }
+
+  $estudiantes = Estudiante::with('tutor')->orderBy('numero_control')->get();
 
   $spreadsheet = new Spreadsheet();
   $sheet       = $spreadsheet->getActiveSheet();
 
-  $sheet->setCellValue('A1', 'ID');
-  $sheet->setCellValue('B1', 'Nombre Completo');
-  $sheet->setCellValue('C1', 'Fecha Nacimiento');
-  $sheet->setCellValue('D1', 'Teléfono');
-  $sheet->setCellValue('E1', 'Payload (JSON)');
+  $headers = ['ID', 'Número de control', 'Nombre completo', 'Fecha nacimiento',
+    'Teléfono', 'Tutor', 'Periodo de captura', 'Capturado', 'Creado'];
+  foreach ($headers as $col => $label) {
+    $sheet->setCellValue(chr(65 + $col) . '1', $label);
+  }
 
   $fila = 2;
   foreach ($estudiantes as $e) {
     $sheet->setCellValue('A' . $fila, $e->id);
-    $sheet->setCellValue('B' . $fila, $e->nombre_completo);
-    $sheet->setCellValue('C' . $fila, $e->fecha_nacimiento);
-    $sheet->setCellValue('D' . $fila, $e->telefono_movil);
-    $sheet->setCellValue('E' . $fila, json_encode($e->payload, JSON_UNESCAPED_UNICODE));
+    $sheet->setCellValue('B' . $fila, $e->numero_control);
+    $sheet->setCellValue('C' . $fila, $e->nombre_completo);
+    $sheet->setCellValue('D' . $fila, $e->fecha_nacimiento);
+    $sheet->setCellValue('E' . $fila, $e->telefono_movil);
+    $sheet->setCellValue('F' . $fila, $e->tutor ? $e->tutor->nombre : null);
+    $sheet->setCellValue('G' . $fila, $e->periodo_captura);
+    $sheet->setCellValue('H' . $fila, !empty($e->capturado) ? 'Sí' : 'No');
+    $sheet->setCellValue('I' . $fila, (string) $e->created_at);
     $fila++;
   }
 
@@ -673,7 +765,7 @@ $app->get('/api/estudiantes/exportar', function (Request $request, Response $res
 // Endpoint admin: subir CSV de preregistros para un tutor
 $app->post('/api/admin/tutores/{id}/upload', function (Request $request, Response $response, $args) {
   $tutorId = intval($args['id']);
-  // Verificar contraseña admin (header X-Admin-Password o query admin_password)
+  // Verificar contraseña admin (solo header X-Admin-Password)
   if (!check_admin($request)) {
     $response->getBody()->write(json_encode(['error' => 'Autenticación admin requerida']));
     return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
@@ -755,48 +847,38 @@ $app->post('/api/admin/tutores/{id}/upload', function (Request $request, Respons
 });
 
 
-// Endpoint: reporte sencillo por tutor
-$app->get('/api/tutores/{id}/report', function (Request $request, Response $response, $args) {
-  $tutorId = intval($args['id']);
-  if (!Capsule::table('tutores')->where('id', $tutorId)->where('active', 1)->exists()) {
-    $response->getBody()->write(json_encode(['error' => 'Tutor inválido']));
-    return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
-  }
-
+// Reporte por tutor (compartido por la ruta admin). Devuelve totales y
+// listado de números de control: contiene datos personales, requiere auth.
+function tutor_report_payload(int $tutorId): array
+{
   $total    = Capsule::table('estudiantes')->where('tutor_id', $tutorId)->count();
   $captured = Capsule::table('estudiantes')->where('tutor_id', $tutorId)->where('capturado', 1)->count();
   $pending  = Capsule::table('estudiantes')->where('tutor_id', $tutorId)->where(function ($q) {
     $q->whereNull('capturado')->orWhere('capturado', 0);
   })->count();
 
-  $list = Capsule::table('estudiantes')->where('tutor_id', $tutorId)->select('id', 'numero_control', 'capturado', 'created_at', 'updated_at')->orderBy('numero_control')->get();
+  $list = Capsule::table('estudiantes')->where('tutor_id', $tutorId)
+    ->select('id', 'numero_control', 'capturado', 'created_at', 'updated_at')
+    ->orderBy('numero_control')->get();
 
-  $response->getBody()->write(json_encode(['tutor_id' => $tutorId, 'total' => $total, 'captured' => $captured, 'pending' => $pending, 'list' => $list]));
-  return $response->withHeader('Content-Type', 'application/json');
-});
+  return ['tutor_id' => $tutorId, 'total' => $total, 'captured' => $captured, 'pending' => $pending, 'list' => $list];
+}
 
-// Endpoint admin: reporte restringido por tutor (usa admin password)
+// Endpoint admin: reporte por tutor (requiere X-Admin-Password)
+// Nota: la ruta pública /api/tutores/{id}/report se retiró por exponer
+// números de control sin autenticación; usar esta.
 $app->get('/api/admin/tutores/{id}/report', function (Request $request, Response $response, $args) {
   if (!check_admin($request)) {
     $response->getBody()->write(json_encode(['error' => 'Autenticación admin requerida']));
     return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
   }
-  // Reusar la lógica del reporte público
   $tutorId = intval($args['id']);
   if (!Capsule::table('tutores')->where('id', $tutorId)->where('active', 1)->exists()) {
     $response->getBody()->write(json_encode(['error' => 'Tutor inválido']));
     return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
   }
 
-  $total    = Capsule::table('estudiantes')->where('tutor_id', $tutorId)->count();
-  $captured = Capsule::table('estudiantes')->where('tutor_id', $tutorId)->where('capturado', 1)->count();
-  $pending  = Capsule::table('estudiantes')->where('tutor_id', $tutorId)->where(function ($q) {
-    $q->whereNull('capturado')->orWhere('capturado', 0);
-  })->count();
-
-  $list = Capsule::table('estudiantes')->where('tutor_id', $tutorId)->select('id', 'numero_control', 'capturado', 'created_at', 'updated_at')->orderBy('numero_control')->get();
-
-  $response->getBody()->write(json_encode(['tutor_id' => $tutorId, 'total' => $total, 'captured' => $captured, 'pending' => $pending, 'list' => $list]));
+  $response->getBody()->write(json_encode(tutor_report_payload($tutorId)));
   return $response->withHeader('Content-Type', 'application/json');
 });
 

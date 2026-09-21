@@ -274,6 +274,39 @@
                   <input type="text" name="tipo_vivienda_otro" class="w-full border border-gray-300 rounded-md px-3 py-2" />
                 </div>
               </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1"
+                  >¿Te desplazas en transporte público para asistir a tus clases?</label
+                >
+                <select name="usa_transporte_publico" id="usaTransportePublico" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="0">No</option>
+                  <option value="1">Sí</option>
+                </select>
+              </div>
+              <div id="divTransportePublico" class="hidden">
+                <label class="block text-sm font-semibold text-gray-700 mb-1"
+                  >¿Cuánto tardas en llegar a la institución?</label
+                >
+                <select name="tiempo_traslado_transporte" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="MENOS_DE_10_MIN">Menos de 10 minutos</option>
+                  <option value="DE_10_A_30_MIN">De 10 a 30 minutos</option>
+                  <option value="MAS_DE_30_MIN">Más de 30 minutos</option>
+                  <option value="1_HORA_O_MAS">1 hora o más</option>
+                </select>
+              </div>
+              <div id="divCostoTransporte" class="hidden">
+                <label class="block text-sm font-semibold text-gray-700 mb-1"
+                  >Costo aproximado del transporte</label
+                >
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  name="costo_transporte"
+                  class="w-full border border-gray-300 rounded-md px-3 py-2"
+                />
+                <p class="text-xs text-gray-500 mt-1">Costo por trayecto en pesos</p>
+              </div>
             </div>
           </div>
 
@@ -662,7 +695,7 @@
                 <textarea name="materias_favoritas" class="w-full border border-gray-300 rounded-md px-3 py-2" rows="2"></textarea>
               </div>
               <div class="md:col-span-2">
-                <h4 class="font-semibold">Habilidades escolares (B: Bueno, N: Necesita, M: Mejorar)</h4>
+                <h4 class="font-semibold">Habilidades escolares (B: Bueno · N: Normal · M: Malo)</h4>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
                   <div>
                     <label class="text-sm">Comprensión lectora</label>
@@ -757,14 +790,14 @@
               </div>
               <div id="divCualEnfermedad" class="hidden">
                 <label class="block text-sm font-semibold text-gray-700 mb-1">¿Cuál enfermedad?</label>
-                <select name="cual_enfermedad" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                <select id="cualEnfermedad" name="cual_enfermedad" class="w-full border border-gray-300 rounded-md px-3 py-2">
                   <option value="DIABETES">Diabetes</option>
                   <option value="HIPERTENSION">Hipertensión</option>
                   <option value="ASMA">Asma</option>
                   <option value="ALERGIAS">Alergias</option>
                   <option value="OTRA">Otra</option>
                 </select>
-                <input type="text" name="cual_enfermedad_otro" class="w-full border border-gray-300 rounded-md px-3 py-2 mt-2 hidden" placeholder="Especificar otra enfermedad" />
+                <input type="text" id="cualEnfermedadOtro" name="cual_enfermedad_otro" class="w-full border border-gray-300 rounded-md px-3 py-2 mt-2 hidden" placeholder="Especificar otra enfermedad" />
               </div>
               <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1">¿Tienes alguna condición física que te afecte?</label>
@@ -775,13 +808,13 @@
               </div>
               <div id="divCualCondicion" class="hidden">
                 <label class="block text-sm font-semibold text-gray-700 mb-1">¿Cuál condición?</label>
-                <select name="cual_condicion" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                <select id="cualCondicion" name="cual_condicion" class="w-full border border-gray-300 rounded-md px-3 py-2">
                   <option value="VISUAL">Discapacidad visual</option>
                   <option value="AUDITIVA">Discapacidad auditiva</option>
                   <option value="MOTRIZ">Discapacidad motriz</option>
                   <option value="OTRA">Otra</option>
                 </select>
-                <input type="text" name="cual_condicion_otro" class="w-full border border-gray-300 rounded-md px-3 py-2 mt-2 hidden" placeholder="Especificar" />
+                <input type="text" id="cualCondicionOtro" name="cual_condicion_otro" class="w-full border border-gray-300 rounded-md px-3 py-2 mt-2 hidden" placeholder="Especificar" />
               </div>
               <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1">¿Toma medicación?</label>
@@ -845,13 +878,15 @@
               </div>
               <div id="divTipoApoyo" class="hidden">
                 <label class="block text-sm font-semibold text-gray-700 mb-1">Tipo de apoyo requerido</label>
-                <select name="tipo_apoyo" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                <select id="tipoApoyo" name="tipo_apoyo" class="w-full border border-gray-300 rounded-md px-3 py-2">
                   <option value="ACADEMICO">Académico</option>
                   <option value="PSICOLOGICO">Psicológico</option>
                   <option value="ORIENTACION">Orientación</option>
                   <option value="OTRO">Otro</option>
                 </select>
-                <input type="text" name="tipo_apoyo_otro" class="w-full border border-gray-300 rounded-md px-3 py-2 mt-2 hidden" placeholder="Especificar otro apoyo" />
+                <input type="text" id="tipoApoyoOtro" name="tipo_apoyo_otro" class="w-full border border-gray-300 rounded-md px-3 py-2 mt-2 hidden" placeholder="Especificar otro apoyo" />
+                <label class="block text-sm font-semibold text-gray-700 mt-3">¿De qué forma te gustaría recibir ese apoyo?</label>
+                <textarea name="forma_apoyo_institucion" class="w-full border border-gray-300 rounded-md px-3 py-2" rows="2" placeholder="Describe cómo esperas recibir el apoyo"></textarea>
               </div>
               <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1">Pasatiempo favorito</label>

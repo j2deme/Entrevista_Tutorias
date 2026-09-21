@@ -162,6 +162,14 @@ document.addEventListener("DOMContentLoaded", () => {
   setupShowOnValue("vivesCon", "OTROS", "divVivesConOtro");
   // Mostrar campo adicional cuando se elige 'OTRA' en tipo de beca
   setupShowOnValue("tipoBeca", "OTRA", "divTipoBecaOtro");
+  // Campos "especificar otro/otra" que antes quedaban siempre ocultos
+  setupShowOnValue("tipoVivienda", "OTRA", "divTipoViviendaOtro");
+  setupShowOnValue("cualEnfermedad", "OTRA", "cualEnfermedadOtro");
+  setupShowOnValue("cualCondicion", "OTRA", "cualCondicionOtro");
+  setupShowOnValue("tipoApoyo", "OTRO", "tipoApoyoOtro");
+  // Transporte público: tiempo de traslado y costo solo si aplica
+  setupToggle("usaTransportePublico", "divTransportePublico");
+  setupToggle("usaTransportePublico", "divCostoTransporte");
 
   function setupToggle(selectId, targetDivId) {
     const sel = document.getElementById(selectId);
@@ -407,6 +415,20 @@ document.addEventListener("DOMContentLoaded", () => {
       delete payload.tipo_apoyo_otro;
     }
 
+    // Fusionar los demás campos "..._otro/otra" con su select
+    if (payload.tipo_beca === "OTRA" && payload.tipo_beca_otro) {
+      payload.tipo_beca = payload.tipo_beca_otro;
+      delete payload.tipo_beca_otro;
+    }
+    if (payload.cual_enfermedad === "OTRA" && payload.cual_enfermedad_otro) {
+      payload.cual_enfermedad = payload.cual_enfermedad_otro;
+      delete payload.cual_enfermedad_otro;
+    }
+    if (payload.cual_condicion === "OTRA" && payload.cual_condicion_otro) {
+      payload.cual_condicion = payload.cual_condicion_otro;
+      delete payload.cual_condicion_otro;
+    }
+
     // Asegurar honeypot y token CSRF en snake_case
     payload.hp_email = payload.hp_email || payload.hpEmail || "";
     payload.csrf_token =
@@ -415,11 +437,6 @@ document.addEventListener("DOMContentLoaded", () => {
       payload.csrf_token ||
       payload.csrfToken ||
       "";
-
-    console.log(
-      "Enviando JSON estructurado a Backend:",
-      JSON.stringify(payload, null, 2),
-    );
 
     // Limpia errores previos antes de enviar
     clearFieldErrors();
@@ -432,8 +449,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       if (response.ok) {
-        const body = await response.json();
-        console.log("Guardado OK", body);
+        await response.json();
         alert("¡Ficha capturada y registrada correctamente!");
         // Resetear formulario automáticamente y volver al panel de verificación
         form.reset();
@@ -475,10 +491,7 @@ document.addEventListener("DOMContentLoaded", () => {
           let firstEl = null;
           for (const [field, msg] of Object.entries(err.fields)) {
             showFieldError(field, msg);
-            if (!firstEl) {
-              const el = form.querySelector(`[name="${field}"]`);
-              if (el) firstEl = el;
-            }
+            if (!firstEl) firstEl = findField(field);
           }
           if (firstEl)
             firstEl.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -489,10 +502,7 @@ document.addEventListener("DOMContentLoaded", () => {
           let firstEl = null;
           for (const fname of err.missing) {
             showFieldError(fname, "Campo requerido");
-            if (!firstEl) {
-              const el = form.querySelector(`[name="${fname}"]`);
-              if (el) firstEl = el;
-            }
+            if (!firstEl) firstEl = findField(fname);
           }
           if (firstEl)
             firstEl.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -563,22 +573,30 @@ document.addEventListener("DOMContentLoaded", () => {
       .forEach((el) => el.classList.remove("border-red-500"));
   }
 
-  function showFieldError(fieldName, message) {
-    // Intentar localizar el elemento por name
-    const el =
+  // Localizar un campo por su nombre (acepta snake_case y camelCase)
+  function findField(fieldName) {
+    if (!fieldName) return null;
+    const snake = String(fieldName).replace(/([A-Z])/g, "_$1").toLowerCase();
+    return (
       form.querySelector(`[name="${fieldName}"]`) ||
-      form.querySelector(`[name="${fieldName}"]`);
+      form.querySelector(`[name="${snake}"]`)
+    );
+  }
+
+  function showFieldError(fieldName, message) {
+    const el = findField(fieldName);
     if (!el) return;
+    const errKey = el.getAttribute("name") || fieldName;
     el.classList.add("border-red-500");
     const p = document.createElement("p");
     p.className = "text-red-600 text-sm mt-1";
-    p.setAttribute("data-error-for", fieldName);
+    p.setAttribute("data-error-for", errKey);
     p.textContent = message;
     // Insertar inmediatamente después del elemento (si es input dentro de div, colocarlo al final del contenedor)
     if (el.parentNode) {
       // Si el siguiente hermano ya es un error para ese campo, reemplazar
       const existing = el.parentNode.querySelector(
-        `[data-error-for="${fieldName}"]`,
+        `[data-error-for="${errKey}"]`,
       );
       if (existing) existing.textContent = message;
       else el.parentNode.insertBefore(p, el.nextSibling);
