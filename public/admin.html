@@ -27,7 +27,8 @@
       }
       input[type="text"],
       input[type="password"],
-      input[type="email"] {
+      input[type="email"],
+      input[type="number"] {
         padding: 6px;
         width: 100%;
       }
@@ -218,6 +219,72 @@
         Selecciona un tutor en la tabla y usa el botón "Seleccionar/Enviar"
         dentro de su fila.
       </p>
+
+      <h3 style="margin-top: 26px">
+        Configuración
+        <small style="font-weight: normal; color: #666">(app_settings)</small>
+      </h3>
+      <div style="max-width: 760px">
+        <div class="row" style="align-items: center">
+          <label
+            class="col"
+            style="display: flex; gap: 6px; align-items: center; font-weight: normal"
+          >
+            <input type="checkbox" id="setFormActive" />
+            Captura abierta (<code>form_active</code> = 1)
+          </label>
+        </div>
+        <div class="row">
+          <label class="col">
+            Periodo de captura
+            <input id="setPeriodo" type="text" placeholder="Ej. 2026-1" />
+          </label>
+          <label class="col">
+            Envíos máx. por IP
+            <input id="setRateMax" type="number" min="1" placeholder="defecto 5" />
+          </label>
+          <label class="col">
+            Ventana (min)
+            <input id="setRateWin" type="number" min="1" placeholder="defecto 10" />
+          </label>
+        </div>
+        <div class="row">
+          <label class="col">
+            Nueva contraseña admin
+            <input
+              id="setAdminPw"
+              type="password"
+              placeholder="Dejar en blanco para no cambiar"
+            />
+          </label>
+          <div style="display: flex; align-items: flex-end">
+            <button id="btnSaveSettings">Guardar configuración</button>
+          </div>
+        </div>
+        <p id="settingsMsg" style="min-height: 16px; margin: 6px 0 0"></p>
+      </div>
+
+      <h4 style="margin: 18px 0 4px">Otras claves</h4>
+      <p style="color: #666; font-size: 13px; margin: 4px 0">
+        Claves que no están en el formulario de arriba. Al guardar, dejar un
+        campo en blanco elimina esa clave y vuelve a su valor por defecto.
+      </p>
+      <table id="settingsTable">
+        <thead>
+          <tr>
+            <th>Clave</th>
+            <th>Valor</th>
+            <th>Actualizada</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="row" style="max-width: 760px; margin-top: 8px">
+        <input id="newSetKey" class="col" type="text" placeholder="clave_nueva" />
+        <input id="newSetVal" class="col" type="text" placeholder="valor" />
+        <button id="btnAddSetting">Añadir clave</button>
+      </div>
 
       <p style="margin-top: 18px; color: #666">
         Nota: esta interfaz usa la cabecera <code>X-Admin-Password</code> para

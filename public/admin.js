@@ -46,6 +46,7 @@
     $("loginBox").classList.add("hidden");
     $("panel").classList.remove("hidden");
     loadTutors();
+    loadSettings();
   }
 
   async function loadTutors() {
@@ -293,12 +294,152 @@
     }
   }
 
+  // --- Gestión de app_settings ------------------------------------------
+
+  // key -> valor actual (para precargar el prompt de edición)
+  let settingsCache = {};
+
+  function settingsMsg(text, isError) {
+    const el = $("settingsMsg");
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = isError ? "#b91c1c" : "#16a34a";
+  }
+
+  async function loadSettings() {
+    const res = await fetch("/api/admin/settings", setAuthHeader({ method: "GET" }));
+    if (!res.ok) {
+      settingsMsg("No se pudo cargar la configuración", true);
+      return;
+    }
+    const list = (await res.json()).settings || [];
+    settingsCache = {};
+    list.forEach((s) => (settingsCache[s.key] = s.value));
+    const get = (k) => list.find((s) => s.key === k);
+
+    const active = get("form_active");
+    $("setFormActive").checked = !!(active && active.value === "1");
+    $("setPeriodo").value = get("periodo")?.value || "";
+    $("setRateMax").value = get("rate_limit_max")?.value || "";
+    $("setRateWin").value = get("rate_limit_window_min")?.value || "";
+    $("setAdminPw").value = "";
+    const pw = get("admin_password");
+    $("setAdminPw").placeholder =
+      pw && pw.has_value
+        ? "••••••••  (en blanco = no cambiar)"
+        : "Sin contraseña definida";
+
+    renderOtherSettings(list.filter((s) => !s.form));
+  }
+
+  function renderOtherSettings(otras) {
+    const tbody = document.querySelector("#settingsTable tbody");
+    tbody.innerHTML = "";
+    if (!otras.length) {
+      tbody.innerHTML =
+        '<tr><td colspan="4" style="color:#666">No hay otras claves</td></tr>';
+      return;
+    }
+    otras.forEach((s) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><code>${escapeHtml(s.key)}</code></td>
+        <td>${escapeHtml(s.value === null ? "" : String(s.value))}</td>
+        <td>${escapeHtml(String(s.updated_at || ""))}</td>
+        <td>
+          <button class="btnEditSet" data-key="${escapeHtml(s.key)}">Editar</button>
+          <button class="btnDelSet" data-key="${escapeHtml(s.key)}">Eliminar</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+    tbody.querySelectorAll(".btnEditSet").forEach((b) => (b.onclick = onEditSetting));
+    tbody.querySelectorAll(".btnDelSet").forEach((b) => (b.onclick = onDeleteSetting));
+  }
+
+  async function putSettings(settings) {
+    const res = await fetch(
+      "/api/admin/settings",
+      setAuthHeader({
+        method: "PUT",
+        body: JSON.stringify({ settings }),
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const detail = data.fields
+        ? Object.entries(data.fields)
+            .map(([k, v]) => k + ": " + v)
+            .join(" · ")
+        : data.error || "HTTP " + res.status;
+      settingsMsg(detail, true);
+      return false;
+    }
+    // Si cambió la contraseña, la actualizamos para no perder la sesión.
+    if (settings.admin_password) {
+      localStorage.setItem(adminKey, settings.admin_password);
+    }
+    settingsMsg("Configuración guardada ✓", false);
+    await loadSettings();
+    return true;
+  }
+
+  async function saveSettings() {
+    const settings = {
+      form_active: $("setFormActive").checked,
+      periodo: $("setPeriodo").value.trim(),
+      rate_limit_max: $("setRateMax").value.trim(),
+      rate_limit_window_min: $("setRateWin").value.trim(),
+    };
+    const pw = $("setAdminPw").value;
+    if (pw) settings.admin_password = pw;
+    await putSettings(settings);
+  }
+
+  async function addSetting() {
+    const key = $("newSetKey").value.trim();
+    if (!key) {
+      settingsMsg("Indica la clave", true);
+      return;
+    }
+    if (await putSettings({ [key]: $("newSetVal").value })) {
+      $("newSetKey").value = "";
+      $("newSetVal").value = "";
+    }
+  }
+
+  async function onEditSetting(e) {
+    const key = e.currentTarget.dataset.key;
+    const next = prompt('Nuevo valor para "' + key + '"', settingsCache[key] || "");
+    if (next === null) return;
+    await putSettings({ [key]: next });
+  }
+
+  async function onDeleteSetting(e) {
+    const key = e.currentTarget.dataset.key;
+    if (!confirm('¿Eliminar la clave "' + key + '"? Volverá a su valor por defecto.'))
+      return;
+    const res = await fetch(
+      "/api/admin/settings/" + encodeURIComponent(key),
+      setAuthHeader({ method: "DELETE" })
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      settingsMsg(data.error || "HTTP " + res.status, true);
+      return;
+    }
+    settingsMsg('Clave "' + key + '" restablecida ✓', false);
+    await loadSettings();
+  }
+
   // wire UI
   $("btnLogin").onclick = login;
   $("btnLogout").onclick = logout;
   $("btnRefresh").onclick = loadTutors;
   $("btnCreate").onclick = createTutor;
   $("btnCloseModal").onclick = closeModal;
+  $("btnSaveSettings").onclick = saveSettings;
+  $("btnAddSetting").onclick = addSetting;
   // cerrar al pulsar fuera del cuadro
   $("modalTutorados").onclick = (ev) => {
     if (ev.target === $("modalTutorados")) closeModal();
