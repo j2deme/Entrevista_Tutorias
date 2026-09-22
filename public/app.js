@@ -34,6 +34,28 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   loadTutors();
+  // Tutor precargado desde el CSV: el selector queda bloqueado (no editable).
+  // Un <select disabled> NO se envía en FormData; el submit lo inyecta aparte.
+  function lockTutorSelect(id, nombre) {
+    const sel = document.getElementById("tutorSelect");
+    if (!sel) return;
+    const val = String(id);
+    if (!Array.from(sel.options).some((o) => o.value === val)) {
+      sel.appendChild(new Option(nombre || "Tutor asignado", val));
+    }
+    sel.value = val;
+    sel.disabled = true;
+    sel.classList.add("bg-gray-100");
+    sel.dataset.locked = "1";
+  }
+  function clearTutorSelectLock() {
+    const sel = document.getElementById("tutorSelect");
+    if (!sel || !sel.dataset.locked) return;
+    delete sel.dataset.locked;
+    sel.disabled = false;
+    sel.classList.remove("bg-gray-100");
+    loadTutors(); // restaura la lista original de tutores activos
+  }
   // Manejar verificación de número de control antes de mostrar el formulario completo
   const verifyBtn = document.getElementById("verifyBtn");
   const verifyInput = document.getElementById("numeroControlVerify");
@@ -63,15 +85,15 @@ document.addEventListener("DOMContentLoaded", () => {
       );
       const j = await r.json();
       if (r.ok) {
-        if (j.exists) {
+        if (j.exists && j.capturado) {
           verifyMessage.textContent =
             "Ya existe un registro para ese número de control.";
           verifyMessage.classList.remove("text-green-600");
           verifyMessage.classList.add("text-red-600");
-          // Optionally show details
         } else {
-          verifyMessage.textContent =
-            "Número de control libre. Puedes continuar.";
+          verifyMessage.textContent = j.exists
+            ? "Preregistro encontrado. Completa tu expediente."
+            : "Número de control libre. Puedes continuar.";
           verifyMessage.classList.remove("text-red-600");
           verifyMessage.classList.add("text-green-600");
 
@@ -109,6 +131,10 @@ document.addEventListener("DOMContentLoaded", () => {
             inner.classList.add("bg-gray-100");
             inner.setAttribute("data-prefilled", "1");
           }
+          // Precargado sin datos: bloquear el selector con su tutor asignado;
+          // NC libre: devolver el selector a su estado normal.
+          if (j.exists && j.tutor_id) lockTutorSelect(j.tutor_id, j.tutor_nombre);
+          else clearTutorSelectLock();
           // Scroll to form
           formSections.scrollIntoView({ behavior: "smooth" });
         }
@@ -438,6 +464,13 @@ document.addEventListener("DOMContentLoaded", () => {
       payload.csrfToken ||
       "";
 
+    // Tutor precargado: el select viene deshabilitado y FormData lo excluye,
+    // así que se inyecta aquí (es exactamente el tutor que asignó el admin).
+    const tutorSel = document.getElementById("tutorSelect");
+    if (tutorSel && tutorSel.disabled && tutorSel.value) {
+      payload.tutor_id = Number(tutorSel.value);
+    }
+
     // Limpia errores previos antes de enviar
     clearFieldErrors();
 
@@ -467,6 +500,7 @@ document.addEventListener("DOMContentLoaded", () => {
         isSubmitting = false;
         // Ocultar secciones del formulario y mostrar el panel de verificación
         formSections.classList.add("hidden");
+        clearTutorSelectLock();
         const verifyPanel = document.getElementById("verifyPanel");
         if (verifyPanel) verifyPanel.classList.remove("hidden");
         // Limpiar inputs relacionados con numero control
@@ -544,6 +578,7 @@ document.addEventListener("DOMContentLoaded", () => {
       clearFieldErrors();
       // Ocultar secciones del formulario y mostrar el panel de verificación
       formSections.classList.add("hidden");
+      clearTutorSelectLock();
       // volver al primer paso
       currentStep = 1;
       actualizarPaso();

@@ -429,11 +429,21 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
     return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
   }
 
-  // Verificar que el tutor enviado exista y esté activo
+  // Verificar que el tutor enviado exista. Debe estar activo, salvo que sea
+  // exactamente el tutor ya asignado en el preregistro: si a su tutor lo dan
+  // de baja después de precargar, el tutorado no debe quedar bloqueado.
   $tutorIdCheck = isset($dp['tutorId']) ? intval($dp['tutorId']) : null;
-  if (empty($tutorIdCheck) || !Capsule::table('tutores')->where('id', $tutorIdCheck)->where('active', 1)->exists()) {
+  if (empty($tutorIdCheck) || !Capsule::table('tutores')->where('id', $tutorIdCheck)->exists()) {
     $response->getBody()->write(json_encode(['error' => 'Tutor inválido o inactivo', 'fields' => ['tutor_id' => 'Tutor inválido o inactivo']]));
     return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
+  }
+  if (!Capsule::table('tutores')->where('id', $tutorIdCheck)->where('active', 1)->exists()) {
+    $yaAsignado = !empty($dp['numeroControl'])
+      && Estudiante::where('numero_control', $dp['numeroControl'])->where('tutor_id', $tutorIdCheck)->exists();
+    if (!$yaAsignado) {
+      $response->getBody()->write(json_encode(['error' => 'Tutor inválido o inactivo', 'fields' => ['tutor_id' => 'Tutor inválido o inactivo']]));
+      return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
+    }
   }
 
   // Validaciones con Respect/Validation. Claves en snake_case (name= del form).
@@ -712,7 +722,18 @@ $app->get('/api/estudiantes/check', function (Request $request, Response $respon
   }
 
   $exists = Capsule::table('estudiantes')->where('numero_control', $nc)->exists();
-  $response->getBody()->write(json_encode(['exists' => $exists]));
+  $out    = ['exists' => $exists];
+  if ($exists) {
+    // Información que el formulario necesita para abrir el expediente en modo
+    // "completar preregistro" (capturado=0) con el tutor asignado bloqueado.
+    $row                 = Capsule::table('estudiantes')->where('numero_control', $nc)->first(['capturado', 'tutor_id']);
+    $out['capturado']    = !empty($row->capturado);
+    $out['tutor_id']     = $row->tutor_id !== null ? (int) $row->tutor_id : null;
+    $out['tutor_nombre'] = $row->tutor_id
+      ? Capsule::table('tutores')->where('id', $row->tutor_id)->value('nombre')
+      : null;
+  }
+  $response->getBody()->write(json_encode($out));
   return $response->withHeader('Content-Type', 'application/json');
 });
 
@@ -790,11 +811,13 @@ $app->post('/api/admin/tutores/{id}/upload', function (Request $request, Respons
 
   $stream  = $file->getStream();
   $content = (string) $stream;
+  // Quitar el BOM que escribe Excel en CSV UTF-8 (si no, el encabezado no se
+  // reconoce y la línea caería como error de formato).
+  $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
 
   $lines   = preg_split('/\r\n|\r|\n/', $content);
   $summary = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
-  // Procesar cada línea: esperar campo numero_control (posible encabezado que se ignora si contiene letras)
   foreach ($lines as $ln => $line) {
     $line = trim($line);
     if ($line === '')
@@ -804,6 +827,12 @@ $app->post('/api/admin/tutores/{id}/upload', function (Request $request, Respons
     $nc   = strtoupper(str_replace(' ', '', trim($cols[0] ?? '')));
     if ($nc === '')
       continue;
+    // Líneas de metadato que agrega Excel: encabezado opcional ("numero_control")
+    // o marca de separador ("sep=;"). Se omiten sin error; cualquier otra línea
+    // sigue validándose con la regex de abajo.
+    if ($nc === 'NUMERO_CONTROL' || $nc === 'NUMERODECONTROL' || str_starts_with($nc, 'SEP=')) {
+      continue;
+    }
 
     // Validar formato
     if (!preg_match('/^(?:[BC])?\d{2}69\d{4}$/i', $nc)) {
@@ -817,13 +846,15 @@ $app->post('/api/admin/tutores/{id}/upload', function (Request $request, Respons
         $capturePeriod = Capsule::table('app_settings')->where('key', 'periodo')->value('value');
         $existing      = Estudiante::where('numero_control', $nc)->first();
         if ($existing) {
-          // Si ya fue capturado, saltar
-          if (!empty($existing->capturado)) {
+          // Reasignar solo el tutor, sin tocar datos personales. periodo_captura
+          // NO se mueve: en filas capturadas marca el periodo en que se capturó,
+          // y las pendientes conservan el periodo con el que se precargaron
+          // (al completar el form de todos modos se reescribe con el activo).
+          if ((int) $existing->tutor_id === $tutorId) {
             $summary['skipped']++;
             return;
           }
-          // Actualizar tutor/periodo sin tocar datos personales
-          $existing->update(['tutor_id' => $tutorId, 'periodo_captura' => $capturePeriod ?? $existing->periodo_captura]);
+          $existing->update(['tutor_id' => $tutorId]);
           $summary['updated']++;
         } else {
           // Insertar preregistro con campos personales NULL y capturado = 0
@@ -1185,7 +1216,9 @@ $app->post('/api/admin/tutores', function (Request $request, Response $response)
     $response->getBody()->write(json_encode(['error' => 'Autenticación admin requerida']));
     return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
   }
-  $data   = $request->getParsedBody();
+  // Acepta JSON (fetch + JSON.stringify) y form-urlencoded (URLSearchParams),
+  // mismo patrón que el PUT de abajo.
+  $data = json_decode((string) $request->getBody(), true) ?: $request->getParsedBody();
   $nombre = trim($data['nombre'] ?? '');
   $email  = trim($data['email'] ?? '');
   if ($nombre === '') {
@@ -1243,6 +1276,171 @@ $app->delete('/api/admin/tutores/{id}', function (Request $request, Response $re
   return $response->withHeader('Content-Type', 'application/json');
 });
 
+
+// --- Gestión de app_settings ----------------------------------------------
+
+// Esquema de las claves conocidas: `type` fija la validación y el enmascarado,
+// `form` indica que se gestionan con el formulario del panel. Las claves no
+// listadas son texto libre y aparecen en la tabla "Otras claves".
+function settings_schema(): array
+{
+  static $schema = [
+    'admin_password'        => ['type' => 'password', 'form' => true],
+    'form_active'           => ['type' => 'bool',     'form' => true],
+    'periodo'               => ['type' => 'text',     'form' => true],
+    'rate_limit_max'        => ['type' => 'int',      'form' => true],
+    'rate_limit_window_min' => ['type' => 'int',      'form' => true],
+  ];
+  return $schema;
+}
+
+// Metadatos de una clave; por defecto, texto libre fuera del formulario.
+function setting_meta(string $key): array
+{
+  return settings_schema()[$key] ?? ['type' => 'text', 'form' => false];
+}
+
+// Longitud en caracteres (no bytes) para validar contra VARCHAR(255).
+function setting_length(string $value): int
+{
+  return function_exists('mb_strlen') ? mb_strlen($value) : strlen($value);
+}
+
+// GET /api/admin/settings -> todas las claves. La contraseña nunca sale en
+// claro: solo se indica si tiene valor.
+$app->get('/api/admin/settings', function (Request $request, Response $response) {
+  if (!check_admin($request)) {
+    $response->getBody()->write(json_encode(['error' => 'Autenticación admin requerida']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
+  }
+
+  $settings = [];
+  foreach (Capsule::table('app_settings')->orderBy('key')->get() as $row) {
+    $meta = setting_meta($row->key);
+    $settings[] = [
+      'key'        => $row->key,
+      'value'      => $meta['type'] === 'password' ? null : $row->value,
+      'has_value'  => $row->value !== null && $row->value !== '',
+      'type'       => $meta['type'],
+      'form'       => $meta['form'],
+      'updated_at' => $row->updated_at,
+    ];
+  }
+
+  $response->getBody()->write(json_encode(['settings' => $settings]));
+  return $response->withHeader('Content-Type', 'application/json');
+});
+
+// PUT /api/admin/settings -> upsert de { "settings": { "clave": "valor", ... } }.
+// En text/int, valor vacío = eliminar la clave (vuelve al valor por defecto).
+$app->put('/api/admin/settings', function (Request $request, Response $response) {
+  if (!check_admin($request)) {
+    $response->getBody()->write(json_encode(['error' => 'Autenticación admin requerida']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
+  }
+
+  $body = json_decode((string) $request->getBody(), true);
+  if (!is_array($body)) {
+    $body = $request->getParsedBody();
+  }
+  $input = is_array($body['settings'] ?? null) ? $body['settings'] : null;
+  if ($input === null) {
+    $response->getBody()->write(json_encode(['error' => 'Se espera {"settings": {"clave": "valor"}}']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
+  }
+
+  $errors  = [];
+  $updated = 0;
+  $reset   = 0;
+
+  foreach ($input as $key => $value) {
+    $key = trim((string) $key);
+    if (!preg_match('/^[A-Za-z0-9_.-]{1,100}$/', $key)) {
+      $errors[$key] = 'Clave inválida (letras, números, _ . -)';
+      continue;
+    }
+
+    $type = setting_meta($key)['type'];
+
+    if ($type === 'password') {
+      // En blanco = no tocar. Evita dejar la app sin acceso (check_admin exige
+      // un valor no vacío, y "0" también cuenta como vacío).
+      if ($value === null || trim((string) $value) === '') {
+        continue;
+      }
+      $value = (string) $value;
+      if ($value === '0' || setting_length($value) < 4) {
+        $errors[$key] = 'Mínimo 4 caracteres';
+        continue;
+      }
+    } elseif ($type === 'bool') {
+      $value = $value ? '1' : '0';
+    } elseif ($type === 'int') {
+      if ($value === null || trim((string) $value) === '') {
+        // En blanco = eliminar para volver al valor por defecto (5 / 10).
+        $reset += Capsule::table('app_settings')->where('key', $key)->delete();
+        continue;
+      }
+      $int = filter_var($value, FILTER_VALIDATE_INT);
+      if ($int === false || $int < 1) {
+        $errors[$key] = 'Debe ser un número entero ≥ 1';
+        continue;
+      }
+      $value = (string) $int;
+    } else {
+      $value = trim((string) ($value ?? ''));
+      if ($value === '') {
+        // Texto vacío = quitar la clave (equivale a no configurarla).
+        $reset += Capsule::table('app_settings')->where('key', $key)->delete();
+        continue;
+      }
+    }
+
+    if (setting_length($value) > 255) {
+      $errors[$key] = 'Máximo 255 caracteres';
+      continue;
+    }
+
+    Capsule::table('app_settings')->updateOrInsert(['key' => $key], ['value' => $value]);
+    $updated++;
+  }
+
+  if ($errors) {
+    $response->getBody()->write(json_encode(['error' => 'Revisa los valores', 'fields' => $errors]));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
+  }
+
+  $response->getBody()->write(json_encode(['status' => 'saved', 'updated' => $updated, 'reset' => $reset]));
+  return $response->withHeader('Content-Type', 'application/json');
+});
+
+// DELETE /api/admin/settings/{key} -> restablecer una clave a su valor por defecto.
+$app->delete('/api/admin/settings/{key}', function (Request $request, Response $response, $args) {
+  if (!check_admin($request)) {
+    $response->getBody()->write(json_encode(['error' => 'Autenticación admin requerida']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
+  }
+
+  $key = trim((string) ($args['key'] ?? ''));
+  if (!preg_match('/^[A-Za-z0-9_.-]{1,100}$/', $key)) {
+    $response->getBody()->write(json_encode(['error' => 'Clave inválida']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
+  }
+  if ($key === 'admin_password') {
+    // Sin esta clave check_admin siempre falla: sería un bloqueo total.
+    $response->getBody()->write(json_encode(['error' => 'No se puede eliminar la contraseña admin; cámbiala en su lugar']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
+  }
+
+  if (!Capsule::table('app_settings')->where('key', $key)->delete()) {
+    $response->getBody()->write(json_encode(['error' => 'Clave no encontrada']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+  }
+
+  $response->getBody()->write(json_encode(['status' => 'deleted', 'key' => $key]));
+  return $response->withHeader('Content-Type', 'application/json');
+});
+
 $app->get('/', function (Request $request, Response $response) {
   // Redirige a la página del formulario estático en /public/form.html
   return $response->withHeader('Location', '/form.html')->withStatus(302);
@@ -1252,6 +1450,67 @@ $app->get('/', function (Request $request, Response $response) {
 // Ruta administrativa estática: /admin -> /admin.html
 $app->get('/admin', function (Request $request, Response $response) {
   return $response->withHeader('Location', '/admin.html')->withStatus(302);
+});
+
+
+// --- Manejo de errores y 404 ----------------------------------------------
+// Slim\App::run() NO tiene try/catch, así que sin estas dos piezas cualquier
+// ruta desconocida o excepción no capturada escapaba como Fatal error de PHP,
+// que filtraba rutas, versiones de vendor y rutas internas del contenedor.
+
+// 1) Red de seguridad global: cualquier Throwable pasa a ser una respuesta
+//    HTTP con su código real (404, 405, 500...) en vez de un crash.
+//    APP_DEBUG=true muestra el detalle completo; en producción déjalo en false.
+$debug = filter_var($_ENV['APP_DEBUG'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
+$app->addErrorMiddleware($debug, true, $debug);
+
+// 2) Ruta comodín (registrada la última y solo para GET): lo que no coincida
+//    con ninguna otra ruta cae aquí y devuelve un 404 legible en lugar de
+//    lanzar HttpNotFoundException. JSON para /api/*, página con enlace al
+//    panel para el resto.
+$app->get('/{path:.*}', function (Request $request, Response $response, $args) {
+  $path = '/' . (string) ($args['path'] ?? '');
+
+  // Cortesía: /admin/ (con barra final) también abre el panel.
+  if (rtrim($path, '/') === '/admin') {
+    return $response->withHeader('Location', '/admin.html')->withStatus(302);
+  }
+
+  $wantsJson = str_starts_with($path, '/api/')
+    || str_contains($request->getHeaderLine('Accept'), 'application/json');
+
+  $hintAdmin = in_array(rtrim($path, '/'), ['/api/admin', '/api/admin/'], true)
+    || str_starts_with(rtrim($path, '/'), '/api/admin/');
+
+  if ($wantsJson) {
+    $response->getBody()->write(json_encode([
+      'error' => 'Ruta no encontrada',
+      'path'  => $path,
+      'hint'  => $hintAdmin
+        ? 'El panel de administración está en /admin, no bajo /api/'
+        : null,
+    ]));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+  }
+
+  $hint = '';
+  if ($hintAdmin) {
+    $hint = '<p>¿Buscabas el <a href="/admin">panel de administración</a>?'
+      . ' Vive en <code>/admin</code>, no bajo <code>/api/</code>.</p>';
+  }
+  $response->getBody()->write(
+    '<!doctype html><html lang="es"><head><meta charset="utf-8">'
+    . '<title>404 — Página no encontrada</title></head>'
+    . '<body style="font-family:system-ui,sans-serif;max-width:640px;margin:60px auto;line-height:1.6">'
+    . '<h1>404 — Página no encontrada</h1>'
+    . '<p>No existe la ruta <code>' . htmlspecialchars($path, ENT_QUOTES, 'UTF-8') . '</code>.</p>'
+    . $hint
+    . '<p><a href="/">Volver al formulario</a> · <a href="/admin">Panel admin</a></p>'
+    . '</body></html>'
+  );
+  return $response
+    ->withHeader('Content-Type', 'text/html; charset=utf-8')
+    ->withStatus(404);
 });
 
 $app->run();
