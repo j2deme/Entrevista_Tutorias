@@ -799,7 +799,7 @@ $app->post('/api/admin/tutores/{id}/upload', function (Request $request, Respons
 
   $uploadedFiles = $request->getUploadedFiles();
   if (empty($uploadedFiles['file'])) {
-    $response->getBody()->write(json_encode(['error' => 'Archivo CSV no enviado, campo "file"']));
+    $response->getBody()->write(json_encode(['error' => 'Archivo no enviado, campo "file" (acepta CSV, XLS o XLSX)']));
     return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
   }
 
@@ -815,6 +815,65 @@ $app->post('/api/admin/tutores/{id}/upload', function (Request $request, Respons
   // reconoce y la línea caería como error de formato).
   $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
 
+  // Archivos de Excel binarios (XLS/XLSX) o exportaciones "HTML-Excel": se
+  // abren con PhpSpreadsheet y sólo se extrae la PRIMERA columna (número de
+  // control / matrícula). Cada fila de Excel se vuelve una "línea" virtual
+  // que corre por el MISMO pipeline de validación de abajo: la fila N de
+  // Excel queda como línea N en los errores, el encabezado de la fila 1 se
+  // omite igual y las demás columnas (nombre, etc.) se ignoran.
+  $esXlsx = str_starts_with($content, "PK\x03\x04");
+  $esXls  = str_starts_with($content, "\xD0\xCF\x11\xE0");
+  $esHtml = str_starts_with($content, '<');
+  if ($esXlsx || $esXls || $esHtml) {
+    $tmp = tempnam(sys_get_temp_dir(), 'upl');
+    file_put_contents($tmp, $content);
+    try {
+      $lector = $esXlsx
+        ? new \PhpOffice\PhpSpreadsheet\Reader\Xlsx()
+        : ($esXls
+          ? new \PhpOffice\PhpSpreadsheet\Reader\Xls()
+          : new \PhpOffice\PhpSpreadsheet\Reader\Html());
+      $lector->setReadDataOnly(true);
+      $hoja      = $lector->load($tmp)->getActiveSheet();
+      $renglones = [];
+      foreach ($hoja->getRowIterator() as $fila) {
+        $idx   = $fila->getRowIndex();
+        // getCell() sobre una celda inexistente devuelve celda vacía (NULL)
+        $v = $hoja->getCell('A' . $idx)->getValue();
+        if ($v === null || is_bool($v)) {
+          $txt = '';
+        } elseif (is_int($v)) {
+          $txt = (string) $v;
+        } elseif (is_float($v)) {
+          // Celda numérica: 24690902.0 -> "24690902"
+          $txt = (floor($v) === $v && abs($v) < 1e15) ? sprintf('%.0f', $v) : (string) $v;
+        } elseif (is_object($v)) {
+          $txt = method_exists($v, '__toString') ? (string) $v : '';
+        } else {
+          $txt = (string) $v;
+        }
+        $renglones[$idx] = $txt;
+      }
+      // Rellenar las filas ausentes para conservar la numeración original
+      $ultima        = $renglones === [] ? 0 : max(array_keys($renglones));
+      $lineasExcel   = [];
+      for ($r = 1; $r <= $ultima; $r++) {
+        $lineasExcel[] = $renglones[$r] ?? '';
+      }
+      $content = implode("\n", $lineasExcel);
+    } catch (\Throwable $e) {
+      $response->getBody()->write(json_encode(['error' => 'No se pudo leer el archivo de Excel (¿está dañado o no es CSV/XLS/XLSX?)']));
+      return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
+    } finally {
+      @unlink($tmp);
+    }
+  } elseif (preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $content)) {
+    // Binario que no es Excel (PDF, imagen, .exe...): avisar claro en vez de
+    // dejar que el parser de texto falle con un 500 confuso.
+    $response->getBody()->write(json_encode(['error' => 'El archivo no parece un CSV/Excel legible; sube un CSV, XLS o XLSX']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
+  }
+
   $lines   = preg_split('/\r\n|\r|\n/', $content);
   $summary = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
@@ -824,13 +883,21 @@ $app->post('/api/admin/tutores/{id}/upload', function (Request $request, Respons
       continue;
     // Obtener número de control (primera columna, separar por , o ; o tab)
     $cols = preg_split('/\s*[,;\t]\s*/', $line);
-    $nc   = strtoupper(str_replace(' ', '', trim($cols[0] ?? '')));
+    $col0 = trim($cols[0] ?? '', " \t\"'");
+    $nc   = strtoupper(str_replace(' ', '', $col0));
     if ($nc === '')
       continue;
-    // Líneas de metadato que agrega Excel: encabezado opcional ("numero_control")
-    // o marca de separador ("sep=;"). Se omiten sin error; cualquier otra línea
-    // sigue validándose con la regex de abajo.
-    if ($nc === 'NUMERO_CONTROL' || $nc === 'NUMERODECONTROL' || str_starts_with($nc, 'SEP=')) {
+    // Líneas de metadato que agrega Excel: encabezados de las listas
+    // ("matricula", "numero_control", con o sin acento/mayúsculas) o la
+    // marca de separador ("sep=;"). Se omiten sin error; cualquier otra
+    // línea sigue validándose con la regex de abajo.
+    $clave = strtr(strtolower($col0), [
+      'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u',
+      'Á' => 'a', 'É' => 'e', 'Í' => 'i', 'Ó' => 'o', 'Ú' => 'u', 'Ü' => 'u',
+      ' ' => '', '_' => '',
+    ]);
+    if (in_array($clave, ['numerodecontrol', 'numerocontrol', 'matricula'], true)
+      || str_starts_with($clave, 'sep=')) {
       continue;
     }
 

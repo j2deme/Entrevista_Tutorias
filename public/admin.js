@@ -162,7 +162,7 @@
     const id = e.currentTarget.dataset.id;
     const input = document.querySelector('.fileInput[data-id="' + id + '"]');
     if (!input || !input.files || input.files.length === 0) {
-      alert("Selecciona un archivo CSV");
+      alert("Selecciona un archivo CSV, XLS o XLSX");
       return;
     }
     const f = input.files[0];
