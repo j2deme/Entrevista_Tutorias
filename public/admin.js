@@ -80,8 +80,8 @@
           <div class="pct">${pct}%</div>
         </td>
         <td>
-          <input type="file" data-id="${t.id}" class="fileInput" accept="text/csv" style="display:inline-block">
-          <button data-id="${t.id}" class="btnUpload">Enviar CSV</button>
+          <input type="file" data-id="${t.id}" class="fileInput" accept=".csv,.xls,.xlsx,text/csv" style="display:inline-block">
+          <button data-id="${t.id}" data-nombre="${nm}" class="btnUpload">Enviar lista</button>
         </td>
         <td>
           <button data-id="${t.id}" data-nombre="${nm}" class="btnSave">Guardar</button>
@@ -159,23 +159,44 @@
   }
 
   async function onUpload(e) {
-    const id = e.currentTarget.dataset.id;
+    const btn = e.currentTarget;
+    const id = btn.dataset.id;
     const input = document.querySelector('.fileInput[data-id="' + id + '"]');
     if (!input || !input.files || input.files.length === 0) {
       alert("Selecciona un archivo CSV, XLS o XLSX");
       return;
     }
     const f = input.files[0];
+    // Confirmación previa: evita subir la lista al tutor equivocado. Todo lo
+    // que hace el backend es crear/reasignar (nunca borra datos), pero
+    // prevenir sale más barato que notificar el error después.
+    if (!confirm('¿Subir "' + f.name + '" a ' + (btn.dataset.nombre || "este tutor") + '?')) {
+      return;
+    }
     const fd = new FormData();
     fd.append("file", f);
     const opts = setAuthHeader({ method: "POST", body: fd });
-    const res = await fetch("/api/admin/tutores/" + id + "/upload", opts);
-    if (!res.ok) {
-      const t = await res.text();
-      alert("Error upload: " + t);
+    // Estado de carga: el botón se bloquea y marca "Subiendo…" mientras el
+    // archivo viaja (evita doble clic y subidas repetidas si la red tarda).
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Subiendo…";
+    let data = null;
+    let error = null;
+    try {
+      const res = await fetch("/api/admin/tutores/" + id + "/upload", opts);
+      if (res.ok) data = await res.json();
+      else error = await res.text();
+    } catch (ex) {
+      error = String(ex);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+    if (error !== null) {
+      alert("Error upload: " + error);
       return;
     }
-    const data = await res.json();
     alert("Upload: " + JSON.stringify(data));
     loadTutors();
   }
