@@ -73,13 +73,14 @@ CREATE TABLE IF NOT EXISTS `datos_escolares` (
   `rendimiento_escolar` ENUM('MUY_BUENO','BUENO','REGULAR','MALO','MUY_MALO') NOT NULL,
   `reprobado_curso` TINYINT(1) DEFAULT 0,
   `causa_reprobacion` TEXT DEFAULT NULL,
+  `materias_reprobadas` SMALLINT UNSIGNED DEFAULT NULL,
   `satisfecho_resultados` TINYINT(1) DEFAULT 1,
   `motivo_satisfaccion` TEXT DEFAULT NULL,
   `ha_estado_becado` TINYINT(1) DEFAULT 0,
   `grado_beca` VARCHAR(50) DEFAULT NULL,
   `tipo_beca` VARCHAR(50) DEFAULT NULL,
   `materias_favoritas` TEXT DEFAULT NULL,
-  `reaccion_padres_calificaciones` ENUM('MUY_BIEN','NORMAL','MUY_MAL','NO_SABEN') DEFAULT NULL,
+  `reaccion_padres_calificaciones` ENUM('MUY_BIEN','NORMAL','MUY_MAL','NO_SABEN','NO_LES_IMPORTA') DEFAULT NULL,
   FOREIGN KEY (`estudiante_id`) REFERENCES `estudiantes`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -122,7 +123,7 @@ CREATE TABLE IF NOT EXISTS `expectativas_ingreso` (
   `que_mas_atrae` TEXT DEFAULT NULL,
   `tiene_preocupacion_curso` TINYINT(1) DEFAULT 0,
   `que_preocupa` TEXT DEFAULT NULL,
-  `estudio_es` ENUM('INTERESANTE','ABURRIDO','UTIL','IMPUESTO','PASATIEMPO','AMIGOS') DEFAULT NULL,
+  `estudio_es` ENUM('INTERESANTE','ABURRIDO','UTIL','IMPUESTO','PASATIEMPO','AMIGOS','IMPORTANTE') DEFAULT NULL,
   `forma_apoyo_institucion` TEXT DEFAULT NULL,
   `desea_apoyo_institucional` TINYINT(1) DEFAULT 0,
   `tipo_apoyo` VARCHAR(100) DEFAULT NULL,
@@ -134,11 +135,11 @@ CREATE TABLE IF NOT EXISTS `expectativas_ingreso` (
   `tiempo_estudio_casa` VARCHAR(50) DEFAULT NULL,
   `cuenta_lugar_adecuado` TINYINT(1) DEFAULT 0,
   `prio_explicacion_clara` INT DEFAULT NULL,
-  `prio_entienda_jovenes` INT DEFAULT NULL,
-  `prio_justo_evaluar` INT DEFAULT NULL,
-  `prio_permita_preguntar` INT DEFAULT NULL,
-  `prio_respete_e_imponga` INT DEFAULT NULL,
-  `prio_no_se_enoje` INT DEFAULT NULL,
+  `prio_paciente` INT DEFAULT NULL,
+  `prio_estricto` INT DEFAULT NULL,
+  `prio_justo` INT DEFAULT NULL,
+  `prio_comprensivo` INT DEFAULT NULL,
+  `prio_buen_humor` INT DEFAULT NULL,
   `prio_otra` TEXT DEFAULT NULL,
   FOREIGN KEY (`estudiante_id`) REFERENCES `estudiantes`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
