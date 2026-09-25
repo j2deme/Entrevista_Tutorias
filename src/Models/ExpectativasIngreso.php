@@ -30,6 +30,12 @@ class ExpectativasIngreso extends Model
     'tiempo_estudio_casa',
     'cuenta_lugar_adecuado',
     'prio_explicacion_clara',
+    'prio_paciente',
+    'prio_estricto',
+    'prio_justo',
+    'prio_comprensivo',
+    'prio_buen_humor',
+    // Nombres previos a db/migracion_paso3.sql (se usan hasta correr el ALTER)
     'prio_entienda_jovenes',
     'prio_justo_evaluar',
     'prio_permita_preguntar',

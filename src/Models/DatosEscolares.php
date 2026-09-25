@@ -27,6 +27,7 @@ class DatosEscolares extends Model
     'grado_beca',
     'tipo_beca',
     'materias_favoritas',
+    'materias_reprobadas',
     'reaccion_padres_calificaciones'
   ];
 }
