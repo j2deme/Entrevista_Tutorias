@@ -46,7 +46,7 @@ Solicitar número de control y validar que no se haya registrado previamente. En
 - Número de hermanos (input number) "Incluido tu mismo, si eres hijo único, poner 1"
 - Lugar que ocupa en la familia (input number) "Si eres hijo único, poner 1"
 - Actualmente vives con (select: Ambos padres, Solo padre, Solo madre, Abuelos, Otro familiar, Otro) -> Si la respuesta es "Otro", mostrar un campo adicional para especificar con quién vives (input text)
-- ¿Existe alguna situación reciente en tu familia que pueda afectar tu desempeño académico? (select -> Ninguna, Fallecimiento del padre, Fallecimiento de la madre, Separación de los padres, Divorcio, Abandono, Enfermedad grave de algún familiar, Otro) -> Si la respuesta es "Otro", mostrar un campo adicional para especificar cuál situación (input text)
+- ¿Existe alguna situación reciente en tu familia que pueda afectar tu desempeño académico? (select -> Ninguna, Fallecimiento del padre, Fallecimiento de la madre, Separación / Divorcio de los padres, Abandono, Enfermedad grave de algún familiar, Otro) -> Si la respuesta es "Otro", mostrar un campo adicional para especificar cuál situación (input text)
 - ¿Cómo es la relación con tus padres? (select: Muy buena, Buena, Regular, Mala, Muy mala)
 
 ## Paso 3: Datos académicos
