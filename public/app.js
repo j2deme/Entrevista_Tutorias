@@ -101,9 +101,7 @@ document.addEventListener("DOMContentLoaded", () => {
           // distinto al que se acaba de verificar, reseteamos todo y volvemos al
           // paso 1 antes de prefijar el nuevo NC.
           const normalized = nc.replace(/\s+/g, "").toUpperCase();
-          const innerExisting = document.querySelector(
-            'input[name="numeroControl"]',
-          );
+          const innerExisting = document.getElementById("numeroControl");
           const formEl = document.getElementById("fichaForm");
           if (formSections && !formSections.classList.contains("hidden")) {
             if (
@@ -112,7 +110,10 @@ document.addEventListener("DOMContentLoaded", () => {
               innerExisting.value &&
               innerExisting.value !== normalized
             ) {
-              if (formEl) formEl.reset();
+              if (formEl) {
+                formEl.reset();
+                aplicarMinEdadPadres(null);
+              }
               if (window.__updatePrioritySelectors)
                 window.__updatePrioritySelectors();
               clearFieldErrors();
@@ -124,7 +125,7 @@ document.addEventListener("DOMContentLoaded", () => {
           // Mostrar el formulario completo y prefijar el campo
           formSections.classList.remove("hidden");
           // Prefill the internal numeroControl input if exists and make it readonly
-          const inner = document.querySelector('input[name="numeroControl"]');
+          const inner = document.getElementById("numeroControl");
           if (inner) {
             inner.value = normalized;
             inner.readOnly = true;
@@ -160,6 +161,21 @@ document.addEventListener("DOMContentLoaded", () => {
   const submitBtn = document.getElementById("submitBtn");
   const form = document.getElementById("fichaForm");
 
+  // La edad de los padres nunca puede ser menor que la del tutorado: el min de
+  // padre_edad/madre_edad se actualiza con la edad calculada (validarPasoActual
+  // usa checkValidity, así que el Siguiente lo respeta). min=null lo retira.
+  function aplicarMinEdadPadres(min) {
+    ["padre_edad", "madre_edad"].forEach((n) => {
+      const el = document.querySelector(`[name="${n}"]`);
+      if (!el) return;
+      if (min === null || min === undefined || min === "" || !(Number(min) >= 0)) {
+        el.removeAttribute("min");
+      } else {
+        el.min = String(min);
+      }
+    });
+  }
+
   // Lógica de cálculo automático de Edad
   document.getElementById("fechaNacimiento").addEventListener("change", (e) => {
     const nac = new Date(e.target.value);
@@ -170,6 +186,7 @@ document.addEventListener("DOMContentLoaded", () => {
       edad--;
     }
     document.getElementById("edad").value = edad >= 0 ? edad : 0;
+    aplicarMinEdadPadres(e.target.value && edad >= 0 ? edad : null);
   });
 
   // Toggles Condicionales
@@ -182,14 +199,20 @@ document.addEventListener("DOMContentLoaded", () => {
   setupToggle("condicionFisica", "divCualCondicion");
   setupToggle("tomaMedicacion", "divCualMedicacion");
   setupToggle("haSidoOperado", "divDeQueOperacion");
-  setupToggle("tienePreocupacionCurso", "divQuePreocupa");
   setupToggle("deseaApoyo", "divTipoApoyo");
   // Mostrar campo adicional cuando se elige 'Otros' en con quién vives
   setupShowOnValue("vivesCon", "OTROS", "divVivesConOtro");
   // Mostrar campo adicional cuando se elige 'OTRA' en tipo de beca
+  // Motivo de satisfacción: solo se muestra si el estudiante responde "No"
+  setupShowOnValue("satisfechoResultados", "0", "divMotivoNoSatisfecho");
   setupShowOnValue("tipoBeca", "OTRA", "divTipoBecaOtro");
   // Campos "especificar otro/otra" que antes quedaban siempre ocultos
   setupShowOnValue("tipoVivienda", "OTRA", "divTipoViviendaOtro");
+  // Selects nuevos con especificador "Otro"
+  setupShowOnValue("situacionEspecial", "OTRO", "divSituacionOtro");
+  setupShowOnValue("apoyoEconomico", "OTRO", "divApoyoOtro");
+  setupShowOnValue("causaProblemasSel", "OTRO", "divCausaEstudioOtro");
+  setupShowOnValue("motivoTrabajo", "OTRO", "divMotivoTrabajoOtro");
   setupShowOnValue("cualEnfermedad", "OTRA", "cualEnfermedadOtro");
   setupShowOnValue("cualCondicion", "OTRA", "cualCondicionOtro");
   setupShowOnValue("tipoApoyo", "OTRO", "tipoApoyoOtro");
@@ -204,9 +227,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     sel.addEventListener("change", () => {
       if (sel.value === "1") {
-        target.classList.remove("hidden");
+        target.classList.remove("cond-off");
       } else {
-        target.classList.add("hidden");
+        target.classList.add("cond-off");
       }
     });
   }
@@ -217,8 +240,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const target = document.getElementById(targetDivId);
     if (!sel || !target) return;
     const update = () => {
-      if (sel.value === valueToShow) target.classList.remove("hidden");
-      else target.classList.add("hidden");
+      if (sel.value === valueToShow) target.classList.remove("cond-off");
+      else target.classList.add("cond-off");
     };
     sel.addEventListener("change", update);
     // estado inicial
@@ -342,10 +365,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function validarPasoActual() {
     const stepDiv = document.getElementById(`step-${currentStep}`);
-    const requiredInputs = stepDiv.querySelectorAll("[required]");
-    for (let input of requiredInputs) {
-      if (!input.value.trim()) {
+    // Checar TODOS los controles del paso (no solo required): asi un valor
+    // fuera de rango (ej. edad negativa con min=0) se frena AQUI, en el paso
+    // visible; si no, el navegador bloquearia el envio final sin feedback
+    // porque el campo invalido estaria en un paso oculto (no enfocable).
+    const fields = stepDiv.querySelectorAll("input, select, textarea");
+    for (let input of fields) {
+      if (!input.checkValidity()) {
         input.focus();
+        if (typeof input.reportValidity === "function") input.reportValidity();
         return false;
       }
     }
@@ -419,14 +447,12 @@ document.addEventListener("DOMContentLoaded", () => {
       delete payload.vives_con_otro;
     }
 
-    // Componer causas de problemas de estudio desde checkboxes + campo libre
+    // Causa de problemas de estudio: select único (spec) + "Otro" especificador
     const causas = [];
-    if (payload.causa_me_organizo_mal) causas.push("Me organizo mal");
-    if (payload.causa_no_me_interesa) causas.push("No me interesa");
-    if (payload.causa_por_distrarme) causas.push("Por distraerme en otra cosa");
-    if (payload.causa_no_tengo_lugar)
-      causas.push("No tengo lugar adecuado para estudiar");
+    const causaSel = payload.causa_problemas_sel;
+    if (causaSel && causaSel !== "OTRO") causas.push(causaSel);
     if (
+      causaSel === "OTRO" &&
       payload.causa_problemas_estudio &&
       String(payload.causa_problemas_estudio).trim()
     )
@@ -453,6 +479,18 @@ document.addEventListener("DOMContentLoaded", () => {
     if (payload.cual_condicion === "OTRA" && payload.cual_condicion_otro) {
       payload.cual_condicion = payload.cual_condicion_otro;
       delete payload.cual_condicion_otro;
+    }
+    if (payload.situacion_especial === "OTRO" && payload.situacion_especial_otro) {
+      payload.situacion_especial = payload.situacion_especial_otro;
+      delete payload.situacion_especial_otro;
+    }
+    if (payload.apoyo_economico === "OTRO" && payload.apoyo_economico_otro) {
+      payload.apoyo_economico = payload.apoyo_economico_otro;
+      delete payload.apoyo_economico_otro;
+    }
+    if (payload.motivo_trabajo === "OTRO" && payload.motivo_trabajo_otro) {
+      payload.motivo_trabajo = payload.motivo_trabajo_otro;
+      delete payload.motivo_trabajo_otro;
     }
 
     // Asegurar honeypot y token CSRF en snake_case
@@ -504,7 +542,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const verifyPanel = document.getElementById("verifyPanel");
         if (verifyPanel) verifyPanel.classList.remove("hidden");
         // Limpiar inputs relacionados con numero control
-        const inner = document.querySelector('input[name="numeroControl"]');
+        const inner = document.getElementById("numeroControl");
         if (inner) {
           inner.value = "";
           inner.readOnly = false;

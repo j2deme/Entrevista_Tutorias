@@ -31,8 +31,8 @@ function enums(string $key): array
     'zona'                => ['RURAL', 'URBANA'],
     'tipo_vivienda'       => ['PROPIA', 'RENTADA', 'PRESTADA', 'OTRA'],
     'rendimiento_escolar' => ['MUY_BUENO', 'BUENO', 'REGULAR', 'MALO', 'MUY_MALO'],
-    'reaccion_padres'     => ['MUY_BIEN', 'NORMAL', 'MUY_MAL', 'NO_SABEN'],
-    'estudio_es'          => ['INTERESANTE', 'ABURRIDO', 'UTIL', 'IMPUESTO', 'PASATIEMPO', 'AMIGOS'],
+    'reaccion_padres'     => ['MUY_BIEN', 'NORMAL', 'MUY_MAL', 'NO_SABEN', 'NO_LES_IMPORTA'],
+    'estudio_es'          => ['INTERESANTE', 'ABURRIDO', 'UTIL', 'IMPUESTO', 'PASATIEMPO', 'AMIGOS', 'IMPORTANTE'],
     'preferencia_trabajo' => ['SOLO', 'COMPAÑERO', 'EQUIPO', 'IGUAL'],
     'relacion_padres'     => ['MUY_BUENA', 'BUENA', 'REGULAR', 'MALA', 'MUY_MALA'],
     'habilidades'         => ['B', 'N', 'M', 'BUENO', 'NORMAL', 'MALO'],
@@ -94,6 +94,22 @@ function habilidad_to_db($value): ?string
   $map = ['B' => 'Bueno', 'N' => 'Normal', 'M' => 'Malo',
     'BUENO' => 'Bueno', 'NORMAL' => 'Normal', 'MALO' => 'Malo'];
   return $map[strtoupper(trim((string) $value))] ?? null;
+}
+
+function db_enum_contains(string $table, string $column, string $value): bool
+{
+  // ¿Existe el valor en el ENUM actual de la BD? (cache por worker)
+  static $types = [];
+  $key = $table . '.' . $column;
+  if (!array_key_exists($key, $types)) {
+    $rows = Capsule::select(
+      "SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+      [$table, $column]
+    );
+    $types[$key] = $rows ? (string) ($rows[0]->COLUMN_TYPE ?? '') : '';
+  }
+  return stripos($types[$key], "'" . $value . "'") !== false;
 }
 
 // Fusiona el campo libre "..._otro/otra" en su select cuando se eligió la
@@ -267,6 +283,7 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
     'rendimientoEscolar' => $in['rendimiento_escolar'] ?? ($in['rendimientoEscolar'] ?? null),
     'reprobadoCurso' => $in['reprobado_curso'] ?? ($in['reprobadoCurso'] ?? null),
     'causaReprobacion' => $in['causa_reprobacion'] ?? ($in['causaReprobacion'] ?? null),
+    'materiasReprobadas' => $in['materias_reprobadas'] ?? ($in['materiasReprobadas'] ?? null),
     'satisfechoResultados' => $in['satisfecho_resultados'] ?? ($in['satisfechoResultados'] ?? null),
     'motivoSatisfaccion' => $in['motivo_satisfaccion'] ?? ($in['motivoSatisfaccion'] ?? null),
     'haEstadoBecado' => $in['ha_estado_becado'] ?? ($in['haEstadoBecado'] ?? null),
@@ -307,11 +324,11 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
     'formaHacerAmigos' => $in['forma_hacer_amigos'] ?? ($in['formaHacerAmigos'] ?? null),
     'cuentaLugarAdecuado' => $in['cuenta_lugar_adecuado'] ?? ($in['cuentaLugarAdecuado'] ?? null),
     'prio_explicacionClara' => $in['prio_explicacion_clara'] ?? ($in['prio_explicacionClara'] ?? null),
-    'prio_entiendaJovenes' => $in['prio_entienda_jovenes'] ?? ($in['prio_entiendaJovenes'] ?? null),
-    'prio_justoEvaluar' => $in['prio_justo_evaluar'] ?? ($in['prio_justoEvaluar'] ?? null),
-    'prio_permitaPreguntar' => $in['prio_permita_preguntar'] ?? ($in['prio_permitaPreguntar'] ?? null),
-    'prio_respeteEImponga' => $in['prio_respete_e_imponga'] ?? ($in['prio_respeteEImponga'] ?? null),
-    'prio_noSeEnoje' => $in['prio_no_se_enoje'] ?? ($in['prio_noSeEnoje'] ?? null),
+    'prio_paciente' => $in['prio_paciente'] ?? null,
+    'prio_estricto' => $in['prio_estricto'] ?? null,
+    'prio_justo' => $in['prio_justo'] ?? null,
+    'prio_comprensivo' => $in['prio_comprensivo'] ?? null,
+    'prio_buen_humor' => $in['prio_buen_humor'] ?? null,
     'prio_otra' => $in['prio_otra'] ?? null
   ];
 
@@ -331,6 +348,9 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
   merge_otro($de['tipoBeca'], 'OTRA', $in['tipo_beca_otro'] ?? null);
   merge_otro($dm['cualEnfermedad'], 'OTRA', $in['cual_enfermedad_otro'] ?? null);
   merge_otro($dm['cualCondicion'], 'OTRA', $in['cual_condicion_otro'] ?? null);
+  merge_otro($df['situacionEspecial'], 'OTRO', $in['situacion_especial_otro'] ?? null);
+  merge_otro($df['apoyoEconomico'], 'OTRO', $in['apoyo_economico_otro'] ?? null);
+  merge_otro($df['motivoTrabajo'], 'OTRO', $in['motivo_trabajo_otro'] ?? null);
   merge_otro($ei['tipoApoyo'], 'OTRO', $in['tipo_apoyo_otro'] ?? null);
 
   // Transporte público: si no aplica, no deben quedar registrado tiempo ni costo
@@ -475,11 +495,22 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
   enum_or_error($errors, 'rendimiento_escolar', $de['rendimientoEscolar'], enums('rendimiento_escolar'), 'Rendimiento escolar');
   enum_or_error($errors, 'reaccion_padres_calificaciones', $de['reaccionPadresCalificaciones'], enums('reaccion_padres'), 'Reacción ante las calificaciones');
   enum_or_error($errors, 'estudio_es', $ei['estudioEs'], enums('estudio_es'), 'Para ti estudiar es');
+  // "Importante" existe en el ENUM a partir de db/migracion_paso3.sql
+  if (($ei['estudioEs'] ?? null) === 'IMPORTANTE'
+    && !db_enum_contains('expectativas_ingreso', 'estudio_es', 'IMPORTANTE')) {
+    $errors['estudio_es'] = 'La opción "Importante" aún no está habilitada en la BD: ejecuta db/migracion_paso3.sql y reintenta.';
+  }
   // numero de control (obligatorio). El prefijo [B|C] es opcional: [B|C]?YY69####
   if (empty($dp['numeroControl'])) {
     $errors['numero_control'] = 'Número de control requerido';
   } elseif (!preg_match('/^(?:[BC])?\d{2}69\d{4}$/i', (string) $dp['numeroControl'])) {
     $errors['numero_control'] = 'Formato inválido de número de control';
+  }
+  // Materias reprobadas (Paso 3): entero opcional 0-999
+  if ($de['materiasReprobadas'] !== null && $de['materiasReprobadas'] !== '') {
+    if (!preg_match('/^\d{1,3}$/', (string) $de['materiasReprobadas'])) {
+      $errors['materias_reprobadas'] = 'Materias reprobadas inválidas (número entero entre 0 y 999)';
+    }
   }
   // Promedio: validar rango numérico (0-10)
   if ($de['promedio'] !== null && $de['promedio'] !== '') {
@@ -488,6 +519,66 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
     } catch (\Throwable $e) {
       $errors['promedio'] = 'Promedio inválido (debe ser numérico entre 0 y 10)';
     }
+  }
+  // Paso 2: edades y contadores familiares deben ser enteros >= 0
+  // (protege tambien POSTs directos a la API: las columnas son INT con signo)
+  $enterosNoNegativos = [
+    'padreEdad' => 'padre_edad',
+    'madreEdad' => 'madre_edad',
+    'numIntegrantesFamilia' => 'num_integrantes_familia',
+    'numHermanos' => 'num_hermanos',
+    'lugarQueOcupa' => 'lugar_que_ocupa',
+  ];
+  foreach ($enterosNoNegativos as $camel => $snake) {
+    $v = $df[$camel] ?? null;
+    if ($v !== null && $v !== '' && !(is_scalar($v) && preg_match('/^\d+$/', (string) $v))) {
+      $errors[$snake] = 'Debe ser un número entero mayor o igual a 0';
+    }
+  }
+  // Paso 2: integrantes, hijos y lugar entre los hijos son al menos 1
+  // (el tutorado siempre cuenta; un 0 es ilógico venga de donde venga)
+  $enterosDesdeUno = [
+    'numIntegrantesFamilia' => 'num_integrantes_familia',
+    'numHermanos'           => 'num_hermanos',
+    'lugarQueOcupa'         => 'lugar_que_ocupa',
+  ];
+  foreach ($enterosDesdeUno as $camel => $snake) {
+    $v = $df[$camel] ?? null;
+    if ($v !== null && $v !== '' && is_numeric($v) && (int) $v < 1) {
+      $errors[$snake] = 'Debe ser un número entero mayor o igual a 1';
+    }
+  }
+  // Edad de los padres: nunca menor que la edad del tutorado. Se deriva de la
+  // fecha de nacimiento (dato duro del formulario); si falta, se usa el campo edad.
+  $edadT = null;
+  $fNac = isset($dp['fechaNacimiento']) && is_string($dp['fechaNacimiento']) ? trim($dp['fechaNacimiento']) : '';
+  if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $fNac)) {
+    $nac = \DateTime::createFromFormat('Y-m-d', $fNac);
+    if ($nac instanceof \DateTime && $nac->format('Y-m-d') === $fNac) {
+      $edadT = $nac->diff(new \DateTime('today'))->y;
+    }
+  }
+  if ($edadT === null && isset($dp['edad']) && is_numeric($dp['edad'])) {
+    $edadT = (int) $dp['edad'];
+  }
+  if ($edadT !== null && $edadT >= 0) {
+    foreach (['padreEdad' => 'padre_edad', 'madreEdad' => 'madre_edad'] as $camel => $snake) {
+      $v = $df[$camel] ?? null;
+      if ($v !== null && $v !== '' && is_numeric($v) && (int) $v < $edadT) {
+        $errors[$snake] = 'No puede ser menor que la edad del tutorado (' . $edadT . ' años)';
+      }
+    }
+  }
+  // Paso 5: horas de trabajo (columna INT) e ingreso mensual (DECIMAL) nunca
+  // negativos. Ambos opcionales: vacío o 0 son válidos; protege también los
+  // POSTs directos a la API.
+  $hT = $df['horasTrabajo'] ?? null;
+  if ($hT !== null && $hT !== '' && !preg_match('/^\d+$/', (string) $hT)) {
+    $errors['horas_trabajo'] = 'Debe ser un número entero mayor o igual a 0';
+  }
+  $ing = $df['ingresoMensualFamiliar'] ?? null;
+  if ($ing !== null && $ing !== '' && (!is_numeric($ing) || (float) $ing < 0)) {
+    $errors['ingreso_mensual_familiar'] = 'Debe ser un número mayor o igual a 0';
   }
   // Preferencia de trabajo: mapear variantes al valor canónico del ENUM
   $prefRaw = $ei['preferenciaEnClase'] ?? ($ei['preferenciaTrabajo'] ?? null);
@@ -619,7 +710,7 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
       ]);
 
       // Datos escolares
-      DatosEscolares::updateOrCreate(['estudiante_id' => $estudiante->id], [
+      $escolarRow = [
         'institucion_procedencia' => $de['institucionProcedencia'] ?? null,
         'localidad' => $de['localidad'] ?? ($de['localidadEscuela'] ?? null),
         'generacion_egreso' => $de['generacionEgreso'] ?? null,
@@ -634,7 +725,14 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
         'tipo_beca' => $de['tipoBeca'] ?? null,
         'materias_favoritas' => $de['materiasFavoritas'] ?? null,
         'reaccion_padres_calificaciones' => $de['reaccionPadresCalificaciones'] ?? null
-      ]);
+      ];
+      // Campo nuevo (migracion en db/): solo se usa la columna si existe, para
+      // que la captura no dependa de haber corrido el ALTER todavia.
+      if (($de['materiasReprobadas'] ?? null) !== null && $de['materiasReprobadas'] !== ''
+        && Capsule::getSchemaBuilder()->hasColumn('datos_escolares', 'materias_reprobadas')) {
+        $escolarRow['materias_reprobadas'] = int_or_null($de['materiasReprobadas']);
+      }
+      DatosEscolares::updateOrCreate(['estudiante_id' => $estudiante->id], $escolarRow);
 
       // Habilidades (el formulario envía B/N/M; la BD almacena Bueno/Normal/Malo)
       $habRow = [];
@@ -656,7 +754,7 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
       ]);
 
       // Expectativas
-      ExpectativasIngreso::updateOrCreate(['estudiante_id' => $estudiante->id], [
+      $eiRow = [
         'carrera_gusta' => !empty($ei['carreraGusta']) ? 1 : 0,
         'que_mas_atrae' => $ei['queMasAtrae'] ?? null,
         'tiene_preocupacion_curso' => !empty($ei['tienePreocupacionCurso']) ? 1 : 0,
@@ -673,13 +771,30 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
         'forma_hacer_amigos' => $ei['formaHacerAmigos'] ?? null,
         'cuenta_lugar_adecuado' => !empty($ei['cuentaLugarAdecuado']) ? 1 : 0,
         'prio_explicacion_clara' => int_or_null($ei['prio_explicacionClara'] ?? null),
-        'prio_entienda_jovenes' => int_or_null($ei['prio_entiendaJovenes'] ?? null),
-        'prio_justo_evaluar' => int_or_null($ei['prio_justoEvaluar'] ?? null),
-        'prio_permita_preguntar' => int_or_null($ei['prio_permitaPreguntar'] ?? null),
-        'prio_respete_e_imponga' => int_or_null($ei['prio_respeteEImponga'] ?? null),
-        'prio_no_se_enoje' => int_or_null($ei['prio_noSeEnoje'] ?? null),
+        'prio_paciente' => int_or_null($ei['prio_paciente'] ?? null),
+        'prio_estricto' => int_or_null($ei['prio_estricto'] ?? null),
+        'prio_justo' => int_or_null($ei['prio_justo'] ?? null),
+        'prio_comprensivo' => int_or_null($ei['prio_comprensivo'] ?? null),
+        'prio_buen_humor' => int_or_null($ei['prio_buen_humor'] ?? null),
         'prio_otra' => $ei['prio_otra'] ?? null
-      ]);
+      ];
+      // Compatibilidad pre-migracion: si db/migracion_paso3.sql aun no corrio,
+      // escribir en las columnas originales para no perder la captura; al correr
+      // el ALTER, CHANGE conserva esos valores en las columnas renombradas.
+      if (!Capsule::getSchemaBuilder()->hasColumn('expectativas_ingreso', 'prio_paciente')) {
+        $prioCompat = [
+          'prio_paciente'    => 'prio_entienda_jovenes',
+          'prio_estricto'    => 'prio_justo_evaluar',
+          'prio_justo'       => 'prio_permita_preguntar',
+          'prio_comprensivo' => 'prio_respete_e_imponga',
+          'prio_buen_humor'  => 'prio_no_se_enoje',
+        ];
+        foreach ($prioCompat as $nuevo => $viejo) {
+          $eiRow[$viejo] = $eiRow[$nuevo] ?? null;
+          unset($eiRow[$nuevo]);
+        }
+      }
+      ExpectativasIngreso::updateOrCreate(['estudiante_id' => $estudiante->id], $eiRow);
 
       // El intento ya quedó registrado en submit_logs (rate limiting)
 
@@ -1067,12 +1182,12 @@ function col_label(string $col): string
     'forma_hacer_amigos'            => 'Cómo hace amigos',
     'tiempo_estudio_casa'           => 'Tiempo de estudio en casa',
     'cuenta_lugar_adecuado'         => '¿Cuenta con lugar adecuado para estudiar?',
-    'prio_explicacion_clara'        => 'Prioridad 1: explicación clara',
-    'prio_entienda_jovenes'         => 'Prioridad 2: que entienda a los jóvenes',
-    'prio_justo_evaluar'            => 'Prioridad 3: que sea justo al evaluar',
-    'prio_permita_preguntar'        => 'Prioridad 4: que permita preguntar',
-    'prio_respete_e_imponga'        => 'Prioridad 5: que respete e imponga autoridad',
-    'prio_no_se_enoje'              => 'Prioridad 6: que no se enoje',
+    'prio_explicacion_clara'        => 'Prioridad 1: que explique bien',
+    'prio_paciente'                 => 'Prioridad 2: que sea paciente',
+    'prio_estricto'                 => 'Prioridad 3: que sea estricto',
+    'prio_justo'                    => 'Prioridad 4: que sea justo',
+    'prio_comprensivo'              => 'Prioridad 5: que sea comprensivo',
+    'prio_buen_humor'               => 'Prioridad 6: buen sentido del humor',
     'prio_otra'                     => 'Prioridad 7: otra cualidad',
   ];
   return $over[$col] ?? ucfirst(str_replace('_', ' ', $col));

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ficha Escolar de Nuevo Ingreso - TecNM Ciudad Valles</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>.cond-off { visibility: hidden; }</style>
   </head>
   <body class="bg-gray-100 min-h-screen py-8 px-4">
     <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-xl overflow-hidden">
@@ -28,8 +29,8 @@
           >
           <span id="step-tab-2" class="step-tab">2. Datos Familiares</span>
           <span id="step-tab-3" class="step-tab">3. Datos Escolares</span>
-          <span id="step-tab-4" class="step-tab">4. Datos Médicos</span>
-          <span id="step-tab-5" class="step-tab">5. Expectativas</span>
+          <span id="step-tab-4" class="step-tab">4. Expectativas</span>
+          <span id="step-tab-5" class="step-tab">5. Otros datos</span>
         </div>
       </div>
 
@@ -97,12 +98,6 @@
                     placeholder="Ej: B2690123"
                     class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                </div>
-                <div class="md:col-span-2 mt-2">
-                  <label class="block text-sm font-semibold text-gray-700 mb-1">Tutor asignado *</label>
-                  <select id="tutorSelect" name="tutor_id" required class="w-full border border-gray-300 rounded-md px-3 py-2">
-                    <option value="">Cargando lista de tutores...</option>
-                  </select>
                 </div>
               </div>
 
@@ -176,17 +171,6 @@
                 </select>
               </div>
 
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1"
-                  >Teléfono Móvil *</label
-                >
-                <input
-                  type="tel"
-                  name="telefono_movil"
-                  required
-                  class="w-full border border-gray-300 rounded-md px-3 py-2"
-                />
-              </div>
               <div class="md:col-span-2">
                 <label class="block text-sm font-semibold text-gray-700 mb-1"
                   >Domicilio Familiar *</label
@@ -202,19 +186,6 @@
                 </p>
               </div>
               <!-- Removed direccionCurso and localidadCurso as requested -->
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1"
-                  >¿Hablas otra lengua?</label
-                >
-                <select name="habla_otra_lengua" id="hablaOtraLengua" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                  <option value="0">No</option>
-                  <option value="1">Sí</option>
-                </select>
-              </div>
-              <div id="divCualLengua" class="hidden">
-                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Cuál?</label>
-                <input type="text" name="cual_lengua" class="w-full border border-gray-300 rounded-md px-3 py-2" />
-              </div>
               <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1"
                   >Localidad Familiar *</label
@@ -269,43 +240,40 @@
                   <option value="PRESTADA">Prestada</option>
                   <option value="OTRA">Otra</option>
                 </select>
-                <div id="divTipoViviendaOtro" class="hidden mt-2">
+                <div id="divTipoViviendaOtro" class="cond-off mt-2">
                   <label class="block text-sm font-semibold text-gray-700 mb-1">Especificar otro tipo de vivienda</label>
                   <input type="text" name="tipo_vivienda_otro" class="w-full border border-gray-300 rounded-md px-3 py-2" />
                 </div>
               </div>
               <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1"
-                  >¿Te desplazas en transporte público para asistir a tus clases?</label
+                  >Teléfono Móvil *</label
                 >
-                <select name="usa_transporte_publico" id="usaTransportePublico" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                <input
+                  type="tel"
+                  name="telefono_movil"
+                  required
+                  class="w-full border border-gray-300 rounded-md px-3 py-2"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1"
+                  >¿Hablas otra lengua?</label
+                >
+                <select name="habla_otra_lengua" id="hablaOtraLengua" class="w-full border border-gray-300 rounded-md px-3 py-2">
                   <option value="0">No</option>
                   <option value="1">Sí</option>
                 </select>
               </div>
-              <div id="divTransportePublico" class="hidden">
-                <label class="block text-sm font-semibold text-gray-700 mb-1"
-                  >¿Cuánto tardas en llegar a la institución?</label
-                >
-                <select name="tiempo_traslado_transporte" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                  <option value="MENOS_DE_10_MIN">Menos de 10 minutos</option>
-                  <option value="DE_10_A_30_MIN">De 10 a 30 minutos</option>
-                  <option value="MAS_DE_30_MIN">Más de 30 minutos</option>
-                  <option value="1_HORA_O_MAS">1 hora o más</option>
-                </select>
+              <div id="divCualLengua" class="cond-off">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Cuál?</label>
+                <input type="text" name="cual_lengua" class="w-full border border-gray-300 rounded-md px-3 py-2" />
               </div>
-              <div id="divCostoTransporte" class="hidden">
-                <label class="block text-sm font-semibold text-gray-700 mb-1"
-                  >Costo aproximado del transporte</label
-                >
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  name="costo_transporte"
-                  class="w-full border border-gray-300 rounded-md px-3 py-2"
-                />
-                <p class="text-xs text-gray-500 mt-1">Costo por trayecto en pesos</p>
+              <div class="md:col-span-2 mt-2">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Tutor asignado *</label>
+                <select id="tutorSelect" name="tutor_id" required class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="">Cargando lista de tutores...</option>
+                </select>
               </div>
             </div>
           </div>
@@ -315,225 +283,213 @@
             <h3 class="text-lg font-bold text-gray-800 border-b pb-2 mb-4">
               II. Datos Familiares
             </h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1"
-                  >Nombre del Padre</label
-                >
-                <input
-                  type="text"
-                  name="padre_nombre"
-                  class="w-full border border-gray-300 rounded-md px-3 py-2"
-                />
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1"
-                  >Nombre de la Madre</label
-                >
-                <input
-                  type="text"
-                  name="madre_nombre"
-                  class="w-full border border-gray-300 rounded-md px-3 py-2"
-                />
-              </div>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1"
-                  >Integrantes en la familia *</label
-                >
-                <input
-                  type="number"
-                  name="num_integrantes_familia"
-                  required
-                  class="w-full border border-gray-300 rounded-md px-3 py-2"
-                />
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1"
-                  >Número de Hermanos *</label
-                >
-                <input
-                  type="number"
-                  name="num_hermanos"
-                  required
-                  class="w-full border border-gray-300 rounded-md px-3 py-2"
-                />
-                <p class="text-xs text-gray-500 mt-1">
-                  Incluye a ti mismo, si eres hijo único, coloca 1.
-                </p>
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1"
-                  >Lugar que ocupas *</label
-                >
-                <input
-                  type="number"
-                  name="lugar_que_ocupa"
-                  required
-                  class="w-full border border-gray-300 rounded-md px-3 py-2"
-                />
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1"
-                  >¿Con quién vives? *</label
-                >
-                <select
-                  id="vivesCon"
-                  name="vives_con"
-                  required
-                  class="w-full border border-gray-300 rounded-md px-3 py-2"
-                >
-                  <option value="PADRE_Y_MADRE">Padre y madre</option>
-                  <option value="PADRE">Solo padre</option>
-                  <option value="MADRE">Solo madre</option>
-                  <option value="ABUELOS">Abuelos</option>
-                  <option value="OTROS">Otros (especificar)</option>
-                </select>
-              </div>
-              <div id="divVivesConOtro" class="hidden md:col-span-3 mt-2">
-                <label class="block text-sm font-semibold text-gray-700 mb-1"
-                  >Especifica con quién vives</label
-                >
-                <input
-                  type="text"
-                  name="vives_con_otro"
-                  class="w-full border border-gray-300 rounded-md px-3 py-2"
-                />
-              </div>
-              <div class="md:col-span-3 mt-4 border-t pt-4">
-                <h4 class="font-semibold mb-2">Información de padre y madre</h4>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                      <label class="block text-sm font-semibold text-gray-700 mb-1">¿Vive el padre?</label>
-                      <select name="padre_vive" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                        <option value="1">Sí</option>
-                        <option value="0">No</option>
-                      </select>
-                  </div>
-                  <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Edad del padre</label>
-                      <input type="number" name="padre_edad" class="w-full border border-gray-300 rounded-md px-3 py-2" />
-                  </div>
-                    <div>
-                      <label class="block text-sm font-semibold text-gray-700 mb-1">Ocupación actual (puesto/trabajo) - padre</label>
-                      <input type="text" name="padre_ocupacion" class="w-full border border-gray-300 rounded-md px-3 py-2" />
-                    </div>
-                  <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Nivel de estudios (padre)</label>
-                    <select name="padre_nivel_estudios" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                      <option value="SABE_LEER_ESCRIBIR">Sabe leer y escribir</option>
-                      <option value="PRIMARIA_TERMINADA">Primaria terminada</option>
-                      <option value="PRIMARIA_TRUNCA">Primaria trunca</option>
-                      <option value="SECUNDARIA_TERMINADA">Secundaria terminada</option>
-                      <option value="SECUNDARIA_TRUNCA">Secundaria trunca</option>
-                      <option value="PREPARATORIA_TERMINADA">Preparatoria terminada</option>
-                      <option value="PREPARATORIA_TRUNCA">Preparatoria trunca</option>
-                      <option value="CARRERA_TECNICA_TERMINADA">Carrera técnica terminada</option>
-                      <option value="CARRERA_TECNICA_TRUNCA">Carrera técnica trunca</option>
-                      <option value="LICENCIATURA_TERMINADA">Licenciatura terminada</option>
-                      <option value="LICENCIATURA_TRUNCA">Licenciatura trunca</option>
-                      <option value="MAESTRIA_TERMINADA">Maestría terminada</option>
-                      <option value="MAESTRIA_TRUNCA">Maestría trunca</option>
-                      <option value="DOCTORADO_TERMINADO">Doctorado terminado</option>
-                      <option value="DOCTORADO_TRUNCO">Doctorado trunco</option>
-                    </select>
-                  </div>
-                  <!-- duplicate padre ocupacion removed (kept padre_ocupacion above) -->
-
-                  <div>
-                      <label class="block text-sm font-semibold text-gray-700 mb-1">¿Vive la madre?</label>
-                      <select name="madre_vive" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                        <option value="1">Sí</option>
-                        <option value="0">No</option>
-                      </select>
-                  </div>
-                  <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Edad de la madre</label>
-                      <input type="number" name="madre_edad" class="w-full border border-gray-300 rounded-md px-3 py-2" />
-                  </div>
-                    <div>
-                      <label class="block text-sm font-semibold text-gray-700 mb-1">Ocupación actual (puesto/trabajo) - madre</label>
-                      <input type="text" name="madre_ocupacion" class="w-full border border-gray-300 rounded-md px-3 py-2" />
-                    </div>
-                  <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Nivel de estudios (madre)</label>
-                    <select name="madre_nivel_estudios" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                      <option value="SABE_LEER_ESCRIBIR">Sabe leer y escribir</option>
-                      <option value="PRIMARIA_TERMINADA">Primaria terminada</option>
-                      <option value="PRIMARIA_TRUNCA">Primaria trunca</option>
-                      <option value="SECUNDARIA_TERMINADA">Secundaria terminada</option>
-                      <option value="SECUNDARIA_TRUNCA">Secundaria trunca</option>
-                      <option value="PREPARATORIA_TERMINADA">Preparatoria terminada</option>
-                      <option value="PREPARATORIA_TRUNCA">Preparatoria trunca</option>
-                      <option value="CARRERA_TECNICA_TERMINADA">Carrera técnica terminada</option>
-                      <option value="CARRERA_TECNICA_TRUNCA">Carrera técnica trunca</option>
-                      <option value="LICENCIATURA_TERMINADA">Licenciatura terminada</option>
-                      <option value="LICENCIATURA_TRUNCA">Licenciatura trunca</option>
-                      <option value="MAESTRIA_TERMINADA">Maestría terminada</option>
-                      <option value="MAESTRIA_TRUNCA">Maestría trunca</option>
-                      <option value="DOCTORADO_TERMINADO">Doctorado terminado</option>
-                      <option value="DOCTORADO_TRUNCO">Doctorado trunco</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Ocupación actual (puesto/trabajo) - madre</label>
-                    <!-- duplicate madre ocupacion removed (kept madre_ocupacion above) -->
-                  </div>
+            <fieldset class="border border-gray-300 rounded-md p-4 mb-4">
+              <legend class="text-base font-semibold text-gray-800 px-2 bg-white">Padre</legend>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1"
+                    >Nombre del Padre</label
+                  >
+                  <input
+                    type="text"
+                    name="padre_nombre"
+                    class="w-full border border-gray-300 rounded-md px-3 py-2"
+                  />
                 </div>
-              </div>
-
-              <div class="md:col-span-3 mt-4 border-t pt-4">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Situación familiar especial (p.ej. fallecimiento, separación, abandono) — opcional</label>
-                    <input type="text" name="situacion_especial" class="w-full border border-gray-300 rounded-md px-3 py-2" />
-                  </div>
-                  <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Relación entre padres</label>
-                    <select name="relacion_padres" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                      <option value="MUY_BUENA">Muy buena</option>
-                      <option value="BUENA">Buena</option>
-                      <option value="REGULAR">Regular</option>
-                      <option value="MALA">Mala</option>
-                      <option value="MUY_MALA">Muy mala</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">¿Trabajas actualmente?</label>
-                    <select id="trabajaActualmente" name="trabaja_actualmente" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                      <option value="0">No</option>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">¿Vive el padre?</label>
+                    <select name="padre_vive" class="w-full border border-gray-300 rounded-md px-3 py-2">
                       <option value="1">Sí</option>
+                      <option value="0">No</option>
                     </select>
-                  </div>
-                  <div id="divDatosTrabajo" class="hidden md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label class="block text-sm font-semibold text-gray-700 mb-1">Horas de trabajo</label>
-                      <input type="number" name="horas_trabajo" class="w-full border border-gray-300 rounded-md px-3 py-2" />
-                    </div>
-                    <div>
-                      <label class="block text-sm font-semibold text-gray-700 mb-1">Empresa / Lugar de trabajo</label>
-                      <input type="text" name="empresa_trabajo" class="w-full border border-gray-300 rounded-md px-3 py-2" />
-                    </div>
-                    <div>
-                      <label class="block text-sm font-semibold text-gray-700 mb-1">Motivo del trabajo</label>
-                      <input type="text" name="motivo_trabajo" class="w-full border border-gray-300 rounded-md px-3 py-2" />
-                    </div>
-                  </div>
-                  <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Apoyo económico</label>
-                    <input type="text" name="apoyo_economico" class="w-full border border-gray-300 rounded-md px-3 py-2" />
-                  </div>
-                  <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Ingreso mensual familiar</label>
-                    <input type="number" name="ingreso_mensual_familiar" class="w-full border border-gray-300 rounded-md px-3 py-2" />
-                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">Edad del padre</label>
+                    <input type="number" min="0" name="padre_edad" class="w-full border border-gray-300 rounded-md px-3 py-2" />
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">Nivel de estudios (padre)</label>
+                  <select name="padre_nivel_estudios" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                    <option value="SABE_LEER_ESCRIBIR">Sabe leer y escribir</option>
+                    <option value="PRIMARIA_TERMINADA">Primaria terminada</option>
+                    <option value="PRIMARIA_TRUNCA">Primaria trunca</option>
+                    <option value="SECUNDARIA_TERMINADA">Secundaria terminada</option>
+                    <option value="SECUNDARIA_TRUNCA">Secundaria trunca</option>
+                    <option value="PREPARATORIA_TERMINADA">Preparatoria terminada</option>
+                    <option value="PREPARATORIA_TRUNCA">Preparatoria trunca</option>
+                    <option value="CARRERA_TECNICA_TERMINADA">Carrera técnica terminada</option>
+                    <option value="CARRERA_TECNICA_TRUNCA">Carrera técnica trunca</option>
+                    <option value="LICENCIATURA_TERMINADA">Licenciatura terminada</option>
+                    <option value="LICENCIATURA_TRUNCA">Licenciatura trunca</option>
+                    <option value="MAESTRIA_TERMINADA">Maestría terminada</option>
+                    <option value="MAESTRIA_TRUNCA">Maestría trunca</option>
+                    <option value="DOCTORADO_TERMINADO">Doctorado terminado</option>
+                    <option value="DOCTORADO_TRUNCO">Doctorado trunco</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">Ocupación actual (puesto/trabajo) - padre</label>
+                  <input type="text" name="padre_ocupacion" class="w-full border border-gray-300 rounded-md px-3 py-2" />
                 </div>
               </div>
-            </div>
-          </div>
+            </fieldset>
 
-          <!-- Step 3 (Escolares) -->
+            <fieldset class="border border-gray-300 rounded-md p-4 mb-4">
+              <legend class="text-base font-semibold text-gray-800 px-2 bg-white">Madre</legend>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1"
+                    >Nombre de la Madre</label
+                  >
+                  <input
+                    type="text"
+                    name="madre_nombre"
+                    class="w-full border border-gray-300 rounded-md px-3 py-2"
+                  />
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">¿Vive la madre?</label>
+                    <select name="madre_vive" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                      <option value="1">Sí</option>
+                      <option value="0">No</option>
+                    </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">Edad de la madre</label>
+                    <input type="number" min="0" name="madre_edad" class="w-full border border-gray-300 rounded-md px-3 py-2" />
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">Nivel de estudios (madre)</label>
+                  <select name="madre_nivel_estudios" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                    <option value="SABE_LEER_ESCRIBIR">Sabe leer y escribir</option>
+                    <option value="PRIMARIA_TERMINADA">Primaria terminada</option>
+                    <option value="PRIMARIA_TRUNCA">Primaria trunca</option>
+                    <option value="SECUNDARIA_TERMINADA">Secundaria terminada</option>
+                    <option value="SECUNDARIA_TRUNCA">Secundaria trunca</option>
+                    <option value="PREPARATORIA_TERMINADA">Preparatoria terminada</option>
+                    <option value="PREPARATORIA_TRUNCA">Preparatoria trunca</option>
+                    <option value="CARRERA_TECNICA_TERMINADA">Carrera técnica terminada</option>
+                    <option value="CARRERA_TECNICA_TRUNCA">Carrera técnica trunca</option>
+                    <option value="LICENCIATURA_TERMINADA">Licenciatura terminada</option>
+                    <option value="LICENCIATURA_TRUNCA">Licenciatura trunca</option>
+                    <option value="MAESTRIA_TERMINADA">Maestría terminada</option>
+                    <option value="MAESTRIA_TRUNCA">Maestría trunca</option>
+                    <option value="DOCTORADO_TERMINADO">Doctorado terminado</option>
+                    <option value="DOCTORADO_TRUNCO">Doctorado trunco</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">Ocupación actual (puesto/trabajo) - madre</label>
+                  <input type="text" name="madre_ocupacion" class="w-full border border-gray-300 rounded-md px-3 py-2" />
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="border border-gray-300 rounded-md p-4 mb-4">
+              <legend class="text-base font-semibold text-gray-800 px-2 bg-white">Datos de la familia</legend>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1"
+                    >Integrantes en tu familia *</label
+                  >
+                  <input
+                    type="number"
+                    min="1"
+                    name="num_integrantes_familia"
+                    required
+                    class="w-full border border-gray-300 rounded-md px-3 py-2"
+                  />
+                  <p class="text-xs text-gray-500 mt-1">
+                    Incluye a todos los que forman tu familia directa (mamá, papá, hermanos, tú).
+                  </p>
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1"
+                    >Número de hijos en la familia *</label
+                  >
+                  <input
+                    type="number"
+                    min="1"
+                    name="num_hermanos"
+                    required
+                    class="w-full border border-gray-300 rounded-md px-3 py-2"
+                  />
+                  <p class="text-xs text-gray-500 mt-1">
+                    Incluye a todos los hijos: tú y tus hermanos. Si eres hijo único, coloca 1.
+                  </p>
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1"
+                    >Lugar que ocupas entre los hijos *</label
+                  >
+                  <input
+                    type="number"
+                    min="1"
+                    name="lugar_que_ocupa"
+                    required
+                    class="w-full border border-gray-300 rounded-md px-3 py-2"
+                  />
+                  <p class="text-xs text-gray-500 mt-1">
+                    Ejemplo: si eres el mayor, coloca 1; si eres el segundo, coloca 2.
+                  </p>
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1"
+                    >¿Con quién vives? *</label
+                  >
+                  <select
+                    id="vivesCon"
+                    name="vives_con"
+                    required
+                    class="w-full border border-gray-300 rounded-md px-3 py-2"
+                  >
+                    <option value="PADRE_Y_MADRE">Padre y madre</option>
+                    <option value="PADRE">Solo padre</option>
+                    <option value="MADRE">Solo madre</option>
+                    <option value="ABUELOS">Abuelos</option>
+                    <option value="OTROS">Otros (especificar)</option>
+                  </select>
+                </div>
+                <div id="divVivesConOtro" class="cond-off md:col-span-3 mt-2">
+                  <label class="block text-sm font-semibold text-gray-700 mb-1"
+                    >Especifica con quién vives</label
+                  >
+                  <input
+                    type="text"
+                    name="vives_con_otro"
+                    class="w-full border border-gray-300 rounded-md px-3 py-2"
+                  />
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">¿Existe alguna situación reciente en tu familia que pueda afectar tu desempeño académico?</label>
+                  <select id="situacionEspecial" name="situacion_especial" required class="w-full border border-gray-300 rounded-md px-3 py-2">
+                    <option value="">—</option>
+                    <option value="NINGUNA">Ninguna</option>
+                    <option value="FALLECIMIENTO_PADRE">Fallecimiento del padre</option>
+                    <option value="FALLECIMIENTO_MADRE">Fallecimiento de la madre</option>
+                    <option value="SEPARACION_O_DIVORCIO">Separación / Divorcio de los padres</option>
+                    <option value="ABANDONO">Abandono</option>
+                    <option value="ENFERMEDAD_GRAVE_FAMILIAR">Enfermedad grave de algún familiar</option>
+                    <option value="OTRO">Otro</option>
+                  </select>
+                  <div id="divSituacionOtro" class="cond-off mt-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Especifica cuál situación</label>
+                    <input type="text" name="situacion_especial_otro" class="w-full border border-gray-300 rounded-md px-3 py-2" />
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">Relación entre padres</label>
+                  <select name="relacion_padres" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                    <option value="MUY_BUENA">Muy buena</option>
+                    <option value="BUENA">Buena</option>
+                    <option value="REGULAR">Regular</option>
+                    <option value="MALA">Mala</option>
+                    <option value="MUY_MALA">Muy mala</option>
+                  </select>
+                </div>
+              </div>
+            </fieldset>
+          </div>
           <div id="step-3" class="form-step hidden">
             <h3 class="text-lg font-bold text-gray-800 border-b pb-2 mb-4">
               III. Datos Escolares
@@ -563,6 +519,21 @@
               </div>
               <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1"
+                  >Promedio General *</label
+                >
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="10"
+                  name="promedio"
+                  required
+                  class="w-full border border-gray-300 rounded-md px-3 py-2"
+                />
+                <p class="text-xs text-gray-500 mt-1">P.e.: 8.7</p>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1"
                   >Generación de Egreso *</label
                 >
                 <input
@@ -571,19 +542,6 @@
                   required
                   class="w-full border border-gray-300 rounded-md px-3 py-2"
                 />
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1"
-                  >Promedio General *</label
-                >
-                <input
-                  type="number"
-                  step="0.01"
-                  name="promedio"
-                  required
-                  class="w-full border border-gray-300 rounded-md px-3 py-2"
-                />
-                <p class="text-xs text-gray-500 mt-1">P.e.: 8.7</p>
               </div>
             </div>
 
@@ -616,74 +574,29 @@
                   <option value="1">Sí</option>
                 </select>
               </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1"
-                  >En general, ¿cuál es la reacción de tus padres ante tus
-                  calificaciones?</label
-                >
-                <select
-                  name="reaccion_padres_calificaciones"
-                  class="w-full border border-gray-300 rounded-md px-3 py-2"
-                >
-                  <option value="MUY_BIEN">Muy bien</option>
-                  <option value="NORMAL">Normal</option>
-                  <option value="MUY_MAL">Muy mal</option>
-                  <option value="NO_SABEN">No saben</option>
-                </select>
-              </div>
             </div>
-          </div>
 
           <div class="mt-4 border-t pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div id="divCausaReprobacion" class="cond-off">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Cuántas materias reprobaste?</label>
+                <input type="number" min="0" max="999" name="materias_reprobadas" class="w-full border border-gray-300 rounded-md px-3 py-2 mb-2" />
                 <label class="block text-sm font-semibold text-gray-700 mb-1">¿Por qué reprobaste? (si aplica)</label>
-                <div id="divCausaReprobacion" class="hidden">
-                  <input type="text" name="causa_reprobacion" class="w-full border border-gray-300 rounded-md px-3 py-2" />
-                </div>
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Estás satisfecho con tus resultados?</label>
-                <select name="satisfecho_resultados" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                  <option value="1">Sí</option>
-                  <option value="0">No</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Motivo de la satisfacción</label>
-                <input type="text" name="motivo_satisfaccion" class="w-full border border-gray-300 rounded-md px-3 py-2" />
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Has estado becado?</label>
-                <select id="haEstadoBecado" name="ha_estado_becado" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                  <option value="0">No</option>
-                  <option value="1">Sí</option>
-                </select>
-              </div>
-              <div id="divGradoBeca" class="hidden">
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Grado de la beca</label>
-                <select name="grado_beca" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                  <option value="PRIMARIA">Primaria</option>
-                  <option value="SECUNDARIA">Secundaria</option>
-                  <option value="BACHILLERATO">Bachillerato</option>
-                </select>
-              </div>
-              <div id="divTipoBeca" class="hidden">
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Tipo de beca</label>
-                <select id="tipoBeca" name="tipo_beca" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                  <option value="MANUTENCION">Manutención</option>
-                  <option value="ALIMENTACION">Alimentación</option>
-                  <option value="TALENTO_DEPORTIVO">Talento Deportivo</option>
-                  <option value="APROVECHAMIENTO">Aprovechamiento</option>
-                  <option value="OTRA">Otra</option>
-                </select>
-                <div id="divTipoBecaOtro" class="hidden mt-2">
-                  <label class="block text-sm font-semibold text-gray-700 mb-1">Especificar otro tipo de beca</label>
-                  <input type="text" name="tipo_beca_otro" class="w-full border border-gray-300 rounded-md px-3 py-2" />
-                </div>
+                <textarea name="causa_reprobacion" class="w-full border border-gray-300 rounded-md px-3 py-2" rows="2"></textarea>
               </div>
               <div class="md:col-span-2">
                 <label class="block text-sm font-semibold text-gray-700 mb-1">Materias favoritas</label>
                 <textarea name="materias_favoritas" class="w-full border border-gray-300 rounded-md px-3 py-2" rows="2"></textarea>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Estás satisfecho con tus resultados?</label>
+                <select id="satisfechoResultados" name="satisfecho_resultados" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="1">Sí</option>
+                  <option value="0">No</option>
+                </select>
+              </div>
+              <div id="divMotivoNoSatisfecho" class="cond-off">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Por qué no estás satisfecho con tus resultados?</label>
+                <textarea name="motivo_satisfaccion" class="w-full border border-gray-300 rounded-md px-3 py-2" rows="2"></textarea>
               </div>
               <div class="md:col-span-2">
                 <h4 class="font-semibold">Habilidades escolares (B: Bueno · N: Normal · M: Malo)</h4>
@@ -762,80 +675,60 @@
                   </div>
                 </div>
               </div>
-            </div>
-
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">En general, ¿cuál es la reacción de tus padres ante tus calificaciones?</label>
+                <select name="reaccion_padres_calificaciones" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="MUY_BIEN">Muy bien</option>
+                  <option value="NORMAL">Normal</option>
+                  <option value="MUY_MAL">Muy mal</option>
+                  <option value="NO_SABEN">No saben</option>
+                  <option value="NO_LES_IMPORTA">No les importa</option>
+                </select>
+              </div>
           </div>
-
-          <!-- Step 4 (Médicos) -->
-          <div id="step-4" class="form-step hidden">
-            <h3 class="text-lg font-bold text-gray-800 border-b pb-2 mb-4">
-              IV. Datos Médicos
-            </h3>
+          <fieldset class="border border-gray-300 rounded-md p-4 mt-4 mb-4">
+            <legend class="text-base font-semibold text-gray-800 px-2 bg-white">Becas y apoyos</legend>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Padeces alguna enfermedad?</label>
-                <select name="padece_enfermedad" id="padeceEnfermedad" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Has estado becado?</label>
+                <select id="haEstadoBecado" name="ha_estado_becado" class="w-full border border-gray-300 rounded-md px-3 py-2">
                   <option value="0">No</option>
                   <option value="1">Sí</option>
                 </select>
               </div>
-              <div id="divCualEnfermedad" class="hidden">
-                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Cuál enfermedad?</label>
-                <select id="cualEnfermedad" name="cual_enfermedad" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                  <option value="DIABETES">Diabetes</option>
-                  <option value="HIPERTENSION">Hipertensión</option>
-                  <option value="ASMA">Asma</option>
-                  <option value="ALERGIAS">Alergias</option>
+              <div id="divGradoBeca" class="cond-off">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Grado de la beca</label>
+                <select name="grado_beca" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="PRIMARIA">Primaria</option>
+                  <option value="SECUNDARIA">Secundaria</option>
+                  <option value="BACHILLERATO">Bachillerato</option>
+                </select>
+              </div>
+              <div id="divTipoBeca" class="cond-off">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Tipo de beca</label>
+                <select id="tipoBeca" name="tipo_beca" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="MANUTENCION">Manutención</option>
+                  <option value="ALIMENTACION">Alimentación</option>
+                  <option value="TRANSPORTE">Transporte</option>
+                  <option value="TALENTO_DEPORTIVO">Talento Deportivo</option>
+                  <option value="TALENTO_ARTISTICO">Talento Artístico</option>
+                  <option value="APROVECHAMIENTO">Aprovechamiento Académico</option>
                   <option value="OTRA">Otra</option>
                 </select>
-                <input type="text" id="cualEnfermedadOtro" name="cual_enfermedad_otro" class="w-full border border-gray-300 rounded-md px-3 py-2 mt-2 hidden" placeholder="Especificar otra enfermedad" />
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Tienes alguna condición física que te afecte?</label>
-                <select id="condicionFisica" name="condicion_fisica" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                  <option value="0">No</option>
-                  <option value="1">Sí</option>
-                </select>
-              </div>
-              <div id="divCualCondicion" class="hidden">
-                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Cuál condición?</label>
-                <select id="cualCondicion" name="cual_condicion" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                  <option value="VISUAL">Discapacidad visual</option>
-                  <option value="AUDITIVA">Discapacidad auditiva</option>
-                  <option value="MOTRIZ">Discapacidad motriz</option>
-                  <option value="OTRA">Otra</option>
-                </select>
-                <input type="text" id="cualCondicionOtro" name="cual_condicion_otro" class="w-full border border-gray-300 rounded-md px-3 py-2 mt-2 hidden" placeholder="Especificar" />
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Toma medicación?</label>
-                <select id="tomaMedicacion" name="toma_medicacion" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                  <option value="0">No</option>
-                  <option value="1">Sí</option>
-                </select>
-              </div>
-              <div id="divCualMedicacion" class="hidden">
-                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Cuál medicación?</label>
-                <input type="text" name="cual_medicacion" class="w-full border border-gray-300 rounded-md px-3 py-2" />
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Ha sido operado?</label>
-                <select id="haSidoOperado" name="ha_sido_operado" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                  <option value="0">No</option>
-                  <option value="1">Sí</option>
-                </select>
-              </div>
-              <div id="divDeQueOperacion" class="hidden">
-                <label class="block text-sm font-semibold text-gray-700 mb-1">¿De qué operación?</label>
-                <input type="text" name="de_que_operacion" class="w-full border border-gray-300 rounded-md px-3 py-2" />
+                <div id="divTipoBecaOtro" class="cond-off mt-2">
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">Especificar otro tipo de beca</label>
+                  <input type="text" name="tipo_beca_otro" class="w-full border border-gray-300 rounded-md px-3 py-2" />
+                </div>
               </div>
             </div>
+          </fieldset>
+
           </div>
 
-          <!-- Step 5 (Expectativas) -->
-          <div id="step-5" class="form-step hidden">
+          <!-- Step 4 (Expectativas) -->
+          <div id="step-4" class="form-step hidden">
             <h3 class="text-lg font-bold text-gray-800 border-b pb-2 mb-4">
-              V. Expectativas
+              IV. Expectativas
             </h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -850,15 +743,23 @@
                 <input type="text" name="que_mas_atrae" class="w-full border border-gray-300 rounded-md px-3 py-2" />
               </div>
               <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Tienes preocupaciones sobre el curso?</label>
-                <select id="tienePreocupacionCurso" name="tiene_preocupacion_curso" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                  <option value="0">No</option>
-                  <option value="1">Sí</option>
+                <label class="block text-sm font-semibold text-gray-700 mb-1"
+                  >Para ti, estudiar es...</label
+                >
+                <select
+                  name="estudio_es"
+                  class="w-full border border-gray-300 rounded-md px-3 py-2"
+                >
+                  <option value="IMPORTANTE">Importante</option>
+                  <option value="INTERESANTE">Algo interesante</option>
+                  <option value="ABURRIDO">Algo aburrido</option>
+                  <option value="UTIL">Algo útil</option>
+                  <option value="IMPUESTO">Impuesto por mis padres</option>
+                  <option value="PASATIEMPO">Un pasatiempo</option>
+                  <option value="AMIGOS">
+                    Un espacio para estar con mis amigos
+                  </option>
                 </select>
-              </div>
-              <div id="divQuePreocupa" class="hidden">
-                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Qué te preocupa?</label>
-                <input type="text" name="que_preocupa" class="w-full border border-gray-300 rounded-md px-3 py-2" />
               </div>
               <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1">¿Deseas apoyo institucional?</label>
@@ -867,7 +768,7 @@
                   <option value="1">Sí</option>
                 </select>
               </div>
-              <div id="divTipoApoyo" class="hidden">
+              <div id="divTipoApoyo" class="cond-off">
                 <label class="block text-sm font-semibold text-gray-700 mb-1">Tipo de apoyo requerido</label>
                 <select id="tipoApoyo" name="tipo_apoyo" class="w-full border border-gray-300 rounded-md px-3 py-2">
                   <option value="ACADEMICO">Académico</option>
@@ -875,7 +776,7 @@
                   <option value="ORIENTACION">Orientación</option>
                   <option value="OTRO">Otro</option>
                 </select>
-                <input type="text" id="tipoApoyoOtro" name="tipo_apoyo_otro" class="w-full border border-gray-300 rounded-md px-3 py-2 mt-2 hidden" placeholder="Especificar otro apoyo" />
+                <input type="text" id="tipoApoyoOtro" name="tipo_apoyo_otro" class="w-full border border-gray-300 rounded-md px-3 py-2 mt-2 cond-off" placeholder="Especificar otro apoyo" />
                 <label class="block text-sm font-semibold text-gray-700 mt-3">¿De qué forma te gustaría recibir ese apoyo?</label>
                 <textarea name="forma_apoyo_institucion" class="w-full border border-gray-300 rounded-md px-3 py-2" rows="2" placeholder="Describe cómo esperas recibir el apoyo"></textarea>
               </div>
@@ -892,29 +793,36 @@
                 <input type="text" name="forma_hacer_amigos" class="w-full border border-gray-300 rounded-md px-3 py-2" />
               </div>
               <div class="md:col-span-2">
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Cuando has tenido problemas con el estudio, ¿a qué crees que se debe? (marca las que apliquen)</label>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <label><input type="checkbox" name="causa_me_organizo_mal" value="1" /> Me organizo mal</label>
-                  <label><input type="checkbox" name="causa_no_me_interesa" value="1" /> Cuando no me interesa</label>
-                  <label><input type="checkbox" name="causa_por_distrarme" value="1" /> Por distraerme en otra cosa</label>
-                  <label><input type="checkbox" name="causa_no_tengo_lugar" value="1" /> No tengo lugar adecuado para estudiar</label>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Cuando has tenido problemas con tus estudios, ¿a qué crees que se debe?</label>
+                <select id="causaProblemasSel" name="causa_problemas_sel" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="">—</option>
+                  <option value="Me organizo mal">Me organizo mal</option>
+                  <option value="No me interesa">No me interesa</option>
+                  <option value="Me distraigo">Me distraigo</option>
+                  <option value="No tengo lugar para estudiar">No tengo lugar para estudiar</option>
+                  <option value="OTRO">Otro</option>
+                </select>
+                <div id="divCausaEstudioOtro" class="cond-off mt-2">
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">Otra (describir)</label>
+                  <input type="text" name="causa_problemas_estudio" class="w-full border border-gray-300 rounded-md px-3 py-2" />
                 </div>
-                <label class="block text-sm font-semibold text-gray-700 mt-2">Otra (describir)</label>
-                <input type="text" name="causa_problemas_estudio" class="w-full border border-gray-300 rounded-md px-3 py-2" />
               </div>
               <!-- Preferencia de trabajo (campo eliminado; usare 'preferenciaEnClase' para preferencias en aula) -->
               <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Cuentas con un lugar adecuado para estudiar?</label>
-                <select name="cuenta_lugar_adecuado" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                  <option value="1">Sí</option>
-                  <option value="0">No</option>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">En clase generalmente prefieres trabajar</label>
+                <select name="preferencia_trabajo" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="SOLO">Solo/a</option>
+                  <option value="COMPANERO">Con algún compañero/a</option>
+                  <option value="EQUIPO">En equipo</option>
+                  <option value="IGUAL">Me da igual</option>
                 </select>
               </div>
+              
               <div class="md:col-span-2 mt-2">
                 <h4 class="font-semibold">Prioridades en el profesor (asigna un número del 1 al 6, 1 = más importante)</h4>
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2">
                   <div>
-                    <label class="block text-sm">Explicación clara</label>
+                    <label class="block text-sm">Que explique bien</label>
                     <select name="prio_explicacion_clara" class="prio-select w-full border border-gray-300 rounded-md px-3 py-2">
                       <option value="">—</option>
                       <option value="1">1</option>
@@ -926,8 +834,8 @@
                     </select>
                   </div>
                   <div>
-                    <label class="block text-sm">Entienda a los jóvenes</label>
-                    <select name="prio_entienda_jovenes" class="prio-select w-full border border-gray-300 rounded-md px-3 py-2">
+                    <label class="block text-sm">Que sea paciente</label>
+                    <select name="prio_paciente" class="prio-select w-full border border-gray-300 rounded-md px-3 py-2">
                       <option value="">—</option>
                       <option value="1">1</option>
                       <option value="2">2</option>
@@ -938,8 +846,8 @@
                     </select>
                   </div>
                   <div>
-                    <label class="block text-sm">Justo al evaluar</label>
-                    <select name="prio_justo_evaluar" class="prio-select w-full border border-gray-300 rounded-md px-3 py-2">
+                    <label class="block text-sm">Que sea estricto</label>
+                    <select name="prio_estricto" class="prio-select w-full border border-gray-300 rounded-md px-3 py-2">
                       <option value="">—</option>
                       <option value="1">1</option>
                       <option value="2">2</option>
@@ -950,8 +858,8 @@
                     </select>
                   </div>
                   <div>
-                    <label class="block text-sm">Permita preguntar</label>
-                    <select name="prio_permita_preguntar" class="prio-select w-full border border-gray-300 rounded-md px-3 py-2">
+                    <label class="block text-sm">Que sea justo</label>
+                    <select name="prio_justo" class="prio-select w-full border border-gray-300 rounded-md px-3 py-2">
                       <option value="">—</option>
                       <option value="1">1</option>
                       <option value="2">2</option>
@@ -962,8 +870,8 @@
                     </select>
                   </div>
                   <div>
-                    <label class="block text-sm">Respete e imponga</label>
-                    <select name="prio_respete_e_imponga" class="prio-select w-full border border-gray-300 rounded-md px-3 py-2">
+                    <label class="block text-sm">Que sea comprensivo</label>
+                    <select name="prio_comprensivo" class="prio-select w-full border border-gray-300 rounded-md px-3 py-2">
                       <option value="">—</option>
                       <option value="1">1</option>
                       <option value="2">2</option>
@@ -974,8 +882,8 @@
                     </select>
                   </div>
                   <div>
-                    <label class="block text-sm">No se enoje sin motivo</label>
-                    <select name="prio_no_se_enoje" class="prio-select w-full border border-gray-300 rounded-md px-3 py-2">
+                    <label class="block text-sm">Que tenga buen sentido del humor</label>
+                    <select name="prio_buen_humor" class="prio-select w-full border border-gray-300 rounded-md px-3 py-2">
                       <option value="">—</option>
                       <option value="1">1</option>
                       <option value="2">2</option>
@@ -998,24 +906,6 @@
               </div>
               <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1"
-                  >Para ti, estudiar es...</label
-                >
-                <select
-                  name="estudio_es"
-                  class="w-full border border-gray-300 rounded-md px-3 py-2"
-                >
-                  <option value="INTERESANTE">Algo interesante</option>
-                  <option value="ABURRIDO">Algo aburrido</option>
-                  <option value="UTIL">Algo útil</option>
-                  <option value="IMPUESTO">Impuesto por mis padres</option>
-                  <option value="PASATIEMPO">Un pasatiempo</option>
-                  <option value="AMIGOS">
-                    Un espacio para estar con mis amigos
-                  </option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1"
                   >¿Cuántas horas a la semana dedicas a estudiar? (fuera del horario de clases)</label
                 >
                 <input
@@ -1028,16 +918,176 @@
                 <p class="text-xs text-gray-500 mt-1">Horas por semana</p>
               </div>
               <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">En clase generalmente prefieres trabajar</label>
-                <select name="preferencia_trabajo" class="w-full border border-gray-300 rounded-md px-3 py-2">
-                  <option value="SOLO">Solo/a</option>
-                  <option value="COMPANERO">Con algún compañero/a</option>
-                  <option value="EQUIPO">En equipo</option>
-                  <option value="IGUAL">Me da igual</option>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Cuentas con un lugar adecuado para estudiar?</label>
+                <select name="cuenta_lugar_adecuado" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="1">Sí</option>
+                  <option value="0">No</option>
                 </select>
               </div>
-              
             </div>
+          </div>
+
+          <!-- Step 5 (Otros datos) -->
+          <div id="step-5" class="form-step hidden">
+            <h3 class="text-lg font-bold text-gray-800 border-b pb-2 mb-4">
+              V. Otros datos importantes
+            </h3>
+            <fieldset class="border border-gray-300 rounded-md p-4 mb-4">
+              <legend class="text-base font-semibold text-gray-800 px-2 bg-white">Médicos</legend>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Padeces alguna enfermedad?</label>
+                <select name="padece_enfermedad" id="padeceEnfermedad" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="0">No</option>
+                  <option value="1">Sí</option>
+                </select>
+              </div>
+              <div id="divCualEnfermedad" class="cond-off">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Cuál enfermedad?</label>
+                <select id="cualEnfermedad" name="cual_enfermedad" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="DIABETES">Diabetes</option>
+                  <option value="HIPERTENSION">Hipertensión</option>
+                  <option value="ASMA">Asma</option>
+                  <option value="ALERGIAS">Alergias</option>
+                  <option value="OTRA">Otra</option>
+                </select>
+                <input type="text" id="cualEnfermedadOtro" name="cual_enfermedad_otro" class="w-full border border-gray-300 rounded-md px-3 py-2 mt-2 cond-off" placeholder="Especificar otra enfermedad" />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Tienes alguna condición física que te afecte?</label>
+                <select id="condicionFisica" name="condicion_fisica" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="0">No</option>
+                  <option value="1">Sí</option>
+                </select>
+              </div>
+              <div id="divCualCondicion" class="cond-off">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Cuál condición?</label>
+                <select id="cualCondicion" name="cual_condicion" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="VISUAL">Discapacidad visual</option>
+                  <option value="AUDITIVA">Discapacidad auditiva</option>
+                  <option value="MOTRIZ">Discapacidad motriz</option>
+                  <option value="OTRA">Otra</option>
+                </select>
+                <input type="text" id="cualCondicionOtro" name="cual_condicion_otro" class="w-full border border-gray-300 rounded-md px-3 py-2 mt-2 cond-off" placeholder="Especificar" />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Toma medicación?</label>
+                <select id="tomaMedicacion" name="toma_medicacion" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="0">No</option>
+                  <option value="1">Sí</option>
+                </select>
+              </div>
+              <div id="divCualMedicacion" class="cond-off">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Cuál medicación?</label>
+                <input type="text" name="cual_medicacion" class="w-full border border-gray-300 rounded-md px-3 py-2" />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Ha sido operado?</label>
+                <select id="haSidoOperado" name="ha_sido_operado" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="0">No</option>
+                  <option value="1">Sí</option>
+                </select>
+              </div>
+              <div id="divDeQueOperacion" class="cond-off">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿De qué operación?</label>
+                <input type="text" name="de_que_operacion" class="w-full border border-gray-300 rounded-md px-3 py-2" />
+              </div>
+            </div>
+            </fieldset>
+            <fieldset class="border border-gray-300 rounded-md p-4 mb-4">
+              <legend class="text-base font-semibold text-gray-800 px-2 bg-white">Laborales y económicos</legend>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Quién te apoya económicamente para tus estudios?</label>
+                <select id="apoyoEconomico" name="apoyo_economico" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="">—</option>
+                  <option value="PADRE">Padre</option>
+                  <option value="MADRE">Madre</option>
+                  <option value="AMBOS">Ambos</option>
+                  <option value="RECURSO_PROPIO">Recurso propio</option>
+                  <option value="OTRO_FAMILIAR">Otro familiar</option>
+                  <option value="OTRO">Otro</option>
+                </select>
+                <div id="divApoyoOtro" class="cond-off mt-2">
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">Especifica quién te apoya</label>
+                  <input type="text" name="apoyo_economico_otro" class="w-full border border-gray-300 rounded-md px-3 py-2" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Aproximadamente, ¿cuánto dinero recibes al mes para tus estudios?</label>
+                <input type="number" min="0" step="0.01" name="ingreso_mensual_familiar" class="w-full border border-gray-300 rounded-md px-3 py-2" />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">¿Trabajas actualmente?</label>
+                <select id="trabajaActualmente" name="trabaja_actualmente" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="0">No</option>
+                  <option value="1">Sí</option>
+                </select>
+              </div>
+              <div id="divDatosTrabajo" class="cond-off md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">Horas de trabajo</label>
+                  <input type="number" min="0" name="horas_trabajo" class="w-full border border-gray-300 rounded-md px-3 py-2" />
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">Empresa / Lugar de trabajo</label>
+                  <input type="text" name="empresa_trabajo" class="w-full border border-gray-300 rounded-md px-3 py-2" />
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">Motivo del trabajo</label>
+                  <select id="motivoTrabajo" name="motivo_trabajo" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                    <option value="">—</option>
+                    <option value="MANTENER_A_MIS_ESTUDIOS">Mantener a mis estudios</option>
+                    <option value="AYUDAR_A_MIS_PADRES">Ayudar a mis padres</option>
+                    <option value="MANTENER_A_MI_FAMILIA">Mantener a mi familia</option>
+                    <option value="OTRO">Otro</option>
+                  </select>
+                  <div id="divMotivoTrabajoOtro" class="cond-off mt-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Especifica el motivo</label>
+                    <input type="text" name="motivo_trabajo_otro" class="w-full border border-gray-300 rounded-md px-3 py-2" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            </fieldset>
+            <fieldset class="border border-gray-300 rounded-md p-4 mb-4">
+              <legend class="text-base font-semibold text-gray-800 px-2 bg-white">Otros</legend>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1"
+                  >¿Te desplazas en transporte público para asistir a tus clases?</label
+                >
+                <select name="usa_transporte_publico" id="usaTransportePublico" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="0">No</option>
+                  <option value="1">Sí</option>
+                </select>
+              </div>
+              <div id="divTransportePublico" class="cond-off">
+                <label class="block text-sm font-semibold text-gray-700 mb-1"
+                  >¿Cuánto tardas en llegar a la institución?</label
+                >
+                <select name="tiempo_traslado_transporte" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <option value="MENOS_DE_10_MIN">Menos de 10 minutos</option>
+                  <option value="DE_10_A_30_MIN">De 10 a 30 minutos</option>
+                  <option value="MAS_DE_30_MIN">Más de 30 minutos</option>
+                  <option value="1_HORA_O_MAS">1 hora o más</option>
+                </select>
+              </div>
+              <div id="divCostoTransporte" class="cond-off">
+                <label class="block text-sm font-semibold text-gray-700 mb-1"
+                  >Costo aproximado del transporte</label
+                >
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  name="costo_transporte"
+                  class="w-full border border-gray-300 rounded-md px-3 py-2"
+                />
+                <p class="text-xs text-gray-500 mt-1">Costo por trayecto en pesos</p>
+              </div>
+            </div>
+            </fieldset>
           </div>
 
           <div class="flex justify-between mt-8 border-t pt-4">
@@ -1064,6 +1114,7 @@
             </button>
               <button type="button" id="resetBtn" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded">Registrar otro</button>
           </div>
+        </div>
       </form>
     </div>
 
