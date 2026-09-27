@@ -1,6 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const adminKey = "admin_password_local";
+  let lastListTitle = "Tutorados";
 
   function setAuthHeader(opts = {}) {
     const pw = localStorage.getItem(adminKey);
@@ -237,6 +238,7 @@
   }
 
   function closeModal() {
+    resetModalView();
     $("modalTutorados").classList.add("hidden");
   }
 
@@ -244,6 +246,7 @@
   async function onView(e) {
     const id = e.currentTarget.dataset.id;
     const nombre = e.currentTarget.dataset.nombre || "";
+    resetModalView();
     const res = await fetch(
       "/api/admin/tutores/" + id + "/report",
       setAuthHeader({ method: "GET" }),
@@ -253,7 +256,8 @@
       return;
     }
     const d = await res.json();
-    $("modalTitle").textContent = "Tutorados de " + nombre;
+    lastListTitle = "Tutorados de " + nombre;
+    $("modalTitle").textContent = lastListTitle;
     $("modalStats").innerHTML =
       "<strong>Total:</strong> " +
       d.total +
@@ -267,7 +271,7 @@
     tbody.innerHTML = "";
     if (!list.length) {
       tbody.innerHTML =
-        '<tr><td colspan="5">Sin tutorados asignados</td></tr>';
+        '<tr><td colspan="6">Sin tutorados asignados</td></tr>';
     }
     list.forEach((s, i) => {
       const ok = s.capturado == 1;
@@ -277,10 +281,173 @@
         <td>${escapeHtml(s.numero_control || "")}</td>
         <td>${escapeHtml(s.nombre_completo || "(sin nombre)")}</td>
         <td><span class="badge ${ok ? "ok" : "pend"}">${ok ? "Respondió" : "Pendiente"}</span></td>
-        <td>${escapeHtml(String(s.updated_at || ""))}</td>`;
+        <td>${escapeHtml(String(s.updated_at || ""))}</td>
+        <td>${
+          ok
+            ? `<button class="btnVerResp" data-id="${id}" data-nc="${escapeHtml(
+                s.numero_control || "",
+              )}" data-nombre="${escapeHtml(s.nombre_completo || "")}">Ver respuestas</button>
+              <button class="btnDelTut" data-id="${id}" data-nc="${escapeHtml(
+                s.numero_control || "",
+              )}" data-nombre="${escapeHtml(s.nombre_completo || "")}">Eliminar</button>`
+            : ""
+        }</td>`;
       tbody.appendChild(tr);
     });
+    tbody
+      .querySelectorAll(".btnVerResp")
+      .forEach((b) => (b.onclick = onVerRespuestas));
+    tbody
+      .querySelectorAll(".btnDelTut")
+      .forEach((b) => (b.onclick = onDeleteTutorado));
     $("modalTutorados").classList.remove("hidden");
+  }
+
+  // Carga y muestra la ficha individual con las respuestas de un tutorado.
+  async function onVerRespuestas(e) {
+    // e.currentTarget solo existe durante la dispatch síncrona: se copia ya.
+    const btn = e.currentTarget;
+    const id = btn.dataset.id;
+    const nc = btn.dataset.nc;
+    const nombre = btn.dataset.nombre || "";
+    try {
+      const res = await fetch(
+        "/api/admin/tutores/" + id + "/tutorados/" + encodeURIComponent(nc),
+        setAuthHeader({ method: "GET" }),
+      );
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      renderFicha(await res.json(), nombre, id);
+    } catch (err) {
+      alert(
+        "No se pudieron cargar las respuestas (" +
+          ((err && err.message) || err) +
+          ")",
+      );
+    }
+  }
+
+  // Pinta la ficha (datos básicos + 6 bloques) y cambia el modal a detalle.
+  function renderFicha(d, fallbackNombre, tutorId) {
+    const est = d.estudiante || {};
+    const badge =
+      est.capturado == 1
+        ? '<span class="badge ok">Respondió</span>'
+        : '<span class="badge pend">Pendiente</span>';
+    const head = `
+      <div class="fichaHead">
+        <strong>${escapeHtml(est.nombre_completo || fallbackNombre || "(sin nombre)")}</strong>
+        &nbsp; ${badge}
+        <br>Número de control: ${escapeHtml(est.numero_control || "")}
+        · Periodo: ${escapeHtml(est.periodo_captura || "—")}
+        · Actualizado: ${escapeHtml(String(est.updated_at || "—"))}
+        <br><button id="btnLimpiarCaptura" data-id="${tutorId}" data-nc="${escapeHtml(
+          est.numero_control || "",
+        )}">Limpiar captura</button>
+      </div>`;
+    const bloques = (d.bloques || [])
+      .map((b) => {
+        const filas = (b.campos || [])
+          .map((c) => {
+            const vacio = !c.valor;
+            return `<tr class="${vacio ? "vac" : ""}"><th>${escapeHtml(
+              c.label || "",
+            )}</th><td>${vacio ? "—" : escapeHtml(c.valor)}</td></tr>`;
+          })
+          .join("");
+        const aviso =
+          b.presente === false
+            ? '<p style="color:#b45309;font-size:12px;margin:4px 0 0">Sin registro en esta sección</p>'
+            : "";
+        return `<h4>${escapeHtml(b.titulo)}</h4>${aviso}<table class="fichaTabla">${filas}</table>`;
+      })
+      .join("");
+    $("fichaView").innerHTML = head + bloques;
+    $("btnLimpiarCaptura").onclick = onLimpiarCaptura;
+    $("tutoradosLista").classList.add("hidden");
+    $("fichaView").classList.remove("hidden");
+    $("btnBackFicha").classList.remove("hidden");
+    $("modalTitle").textContent =
+      "Respuestas de " + (est.nombre_completo || fallbackNombre || "");
+    document.querySelector(".modalBox").scrollTop = 0;
+  }
+
+  // Vuelve al listado (los datos del listado siguen en el DOM).
+  function backToList() {
+    resetModalView();
+    $("modalTitle").textContent = lastListTitle;
+  }
+
+  // Deja el modal en el estado de listado (ficha oculta).
+  function resetModalView() {
+    $("fichaView").classList.add("hidden");
+    $("fichaView").innerHTML = "";
+    $("tutoradosLista").classList.remove("hidden");
+    $("btnBackFicha").classList.add("hidden");
+  }
+
+  // Refresca el listado del modal volviendo a pedir el reporte del tutor
+  // (siempre en estado de listado: resetModalView).
+  function refrescarLista(id) {
+    resetModalView();
+    const btn = document.querySelector('.btnView[data-id="' + id + '"]');
+    if (btn) btn.click();
+  }
+
+  // Vacía las respuestas del tutorado y lo deja Pendiente (capturado=0).
+  async function onLimpiarCaptura(e) {
+    const btn = e.currentTarget;
+    const id = btn.dataset.id;
+    const nc = btn.dataset.nc;
+    const seguro = confirm(
+      "¿Limpiar la captura de este tutorado?\n\n" +
+        "Se borran todas sus respuestas y el tutorado vuelve a quedar como " +
+        "Pendiente para rehacer la captura. No se puede deshacer.",
+    );
+    if (!seguro) return;
+    try {
+      const res = await fetch(
+        "/api/admin/tutores/" +
+          id +
+          "/tutorados/" +
+          encodeURIComponent(nc) +
+          "/captura",
+        setAuthHeader({ method: "DELETE" }),
+      );
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      refrescarLista(id);
+    } catch (err) {
+      alert(
+        "No se pudo limpiar la captura (" + ((err && err.message) || err) + ")",
+      );
+    }
+  }
+
+  // Elimina por completo el tutorado (cascada); para registros de prueba.
+  async function onDeleteTutorado(e) {
+    const btn = e.currentTarget;
+    const id = btn.dataset.id;
+    const nc = btn.dataset.nc;
+    const nombre = btn.dataset.nombre || nc;
+    const seguro = confirm(
+      "¿Eliminar por completo el tutorado " +
+        nombre +
+        " (" +
+        nc +
+        ")?\n\nSe borran también todas sus respuestas y no se puede deshacer.",
+    );
+    if (!seguro) return;
+    try {
+      const res = await fetch(
+        "/api/admin/tutores/" + id + "/tutorados/" + encodeURIComponent(nc),
+        setAuthHeader({ method: "DELETE" }),
+      );
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      refrescarLista(id);
+    } catch (err) {
+      alert(
+        "No se pudo eliminar el tutorado (" + ((err && err.message) || err) + ")",
+      );
+    }
   }
 
   // Descarga el Excel con todas las respuestas de los tutorados del tutor.
@@ -459,6 +626,7 @@
   $("btnRefresh").onclick = loadTutors;
   $("btnCreate").onclick = createTutor;
   $("btnCloseModal").onclick = closeModal;
+  $("btnBackFicha").onclick = backToList;
   $("btnSaveSettings").onclick = saveSettings;
   $("btnAddSetting").onclick = addSetting;
   // cerrar al pulsar fuera del cuadro

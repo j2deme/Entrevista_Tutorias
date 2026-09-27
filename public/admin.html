@@ -140,6 +140,55 @@
         align-items: center;
         gap: 12px;
       }
+      .modalHead > div {
+        display: flex;
+        gap: 8px;
+      }
+
+      /* --- Ficha de respuestas (vista individual dentro del modal) --- */
+      #fichaView {
+        margin-top: 8px;
+      }
+      .fichaHead {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 10px 12px;
+        margin-top: 12px;
+        line-height: 1.6;
+      }
+      #fichaView h4 {
+        margin: 18px 0 6px;
+        font-size: 14px;
+        color: #0f172a;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 4px;
+      }
+      .fichaTabla {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .fichaTabla th {
+        text-align: left;
+        width: 38%;
+        padding: 5px 8px;
+        background: #f8fafc;
+        color: #334155;
+        font-weight: 600;
+        border-bottom: 1px solid #eef2f7;
+        vertical-align: top;
+      }
+      .fichaTabla td {
+        padding: 5px 8px;
+        border-bottom: 1px solid #eef2f7;
+        color: #0f172a;
+        word-break: break-word;
+      }
+      .fichaTabla tr.vac th,
+      .fichaTabla tr.vac td {
+        color: #94a3b8;
+      }
     </style>
   </head>
   <body>
@@ -302,21 +351,28 @@
       <div class="modalBox">
         <div class="modalHead">
           <h3 id="modalTitle">Tutorados</h3>
-          <button id="btnCloseModal">Cerrar</button>
+          <div>
+            <button id="btnBackFicha" class="hidden">← Volver</button>
+            <button id="btnCloseModal">Cerrar</button>
+          </div>
         </div>
-        <p id="modalStats"></p>
-        <table id="tutoradosTable">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Número de control</th>
-              <th>Nombre</th>
-              <th>Estado</th>
-              <th>Última actualización</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div id="tutoradosLista">
+          <p id="modalStats"></p>
+          <table id="tutoradosTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Número de control</th>
+                <th>Nombre</th>
+                <th>Estado</th>
+                <th>Última actualización</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="fichaView" class="hidden"></div>
       </div>
     </div>
 
