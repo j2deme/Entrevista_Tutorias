@@ -108,3 +108,7 @@ Solicitar número de control y validar que no se haya registrado previamente. En
 ### Otros
 
 - ¿Te desplazas en transporte público para asistir a tus clases? (select: Sí, No) -> Si la respuesta es sí, mostrar un campo adicional para especificar cuánto tiempo tardas en llegar a la institución (select: Menos de 10 minutos, De 10 a 30 minutos, Más de 30 minutos, 1 hora o más) y un campo adicional para especificar el costo aproximado del transporte (input number)
+
+## Reglas de envío
+
+- Los campos dentro de un bloque oculto (`.cond-off`, es decir, cuando su pregunta condicional quedó en "No" o en un valor distinto del que los muestra) **no se envían al guardar**: se excluyen del `FormData` al construirlo, así que la base de datos los recibe como `NULL` aunque el valor siga escrito en pantalla. El valor permanece en el DOM por si el tutorado regresa y reactiva el bloque.

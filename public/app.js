@@ -381,6 +381,20 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Procesamiento Final del Formulario (Submit JSON)
+  // Controles que viven dentro de bloques ocultos (cond-off), incluidos los
+  // inputs con la propia clase. Lo que se escribió mientras el bloque estaba
+  // visible no debe guardarse si al enviar quedó oculto (ej. condición
+  // física = "No"). Solo se deshabilitan los que estén habilitados, para no
+  // tocar el select de tutor (deshabilitado a propósito).
+  function controlesOcultos(form) {
+    const set = new Set();
+    form.querySelectorAll(".cond-off").forEach((el) => {
+      if (el.matches("input, textarea, select")) set.add(el);
+      el.querySelectorAll("input, textarea, select").forEach((c) => set.add(c));
+    });
+    return Array.from(set).filter((c) => !c.disabled);
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -394,7 +408,18 @@ document.addEventListener("DOMContentLoaded", () => {
     submitBtn.disabled = true;
     submitBtn.textContent = "Guardando...";
 
+    // Los bloques ocultos (cond-off) se excluyen del envío deshabilitándolos
+    // solo durante la construcción del FormData: el valor permanece en el DOM
+    // por si el tutor regresa y reactiva el bloque.
+    const ocultos = controlesOcultos(form);
+    ocultos.forEach((c) => {
+      c.disabled = true;
+    });
     const formData = new FormData(form);
+    ocultos.forEach((c) => {
+      c.disabled = false;
+    });
+
     const data = {};
 
     formData.forEach((value, key) => {

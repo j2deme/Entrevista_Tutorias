@@ -26,16 +26,16 @@ class FormException extends \Exception
 function enums(string $key): array
 {
   static $catalog = [
-    'genero'              => ['F', 'M', 'NB'],
-    'estado_civil'        => ['SOLTERO', 'CASADO', 'UNION LIBRE', 'DIVORCIADO', 'VIUDO', 'OTRO'],
-    'zona'                => ['RURAL', 'URBANA'],
-    'tipo_vivienda'       => ['PROPIA', 'RENTADA', 'PRESTADA', 'OTRA'],
-    'rendimiento_escolar' => ['MUY_BUENO', 'BUENO', 'REGULAR', 'MALO', 'MUY_MALO'],
-    'reaccion_padres'     => ['MUY_BIEN', 'NORMAL', 'MUY_MAL', 'NO_SABEN', 'NO_LES_IMPORTA'],
-    'estudio_es'          => ['INTERESANTE', 'ABURRIDO', 'UTIL', 'IMPUESTO', 'PASATIEMPO', 'AMIGOS', 'IMPORTANTE'],
-    'preferencia_trabajo' => ['SOLO', 'COMPAÑERO', 'EQUIPO', 'IGUAL'],
-    'relacion_padres'     => ['MUY_BUENA', 'BUENA', 'REGULAR', 'MALA', 'MUY_MALA'],
-    'habilidades'         => ['B', 'N', 'M', 'BUENO', 'NORMAL', 'MALO'],
+  'genero' => ['F', 'M', 'NB'],
+  'estado_civil' => ['SOLTERO', 'CASADO', 'UNION LIBRE', 'DIVORCIADO', 'VIUDO', 'OTRO'],
+  'zona' => ['RURAL', 'URBANA'],
+  'tipo_vivienda' => ['PROPIA', 'RENTADA', 'PRESTADA', 'OTRA'],
+  'rendimiento_escolar' => ['MUY_BUENO', 'BUENO', 'REGULAR', 'MALO', 'MUY_MALO'],
+  'reaccion_padres' => ['MUY_BIEN', 'NORMAL', 'MUY_MAL', 'NO_SABEN', 'NO_LES_IMPORTA'],
+  'estudio_es' => ['INTERESANTE', 'ABURRIDO', 'UTIL', 'IMPUESTO', 'PASATIEMPO', 'AMIGOS', 'IMPORTANTE'],
+  'preferencia_trabajo' => ['SOLO', 'COMPAÑERO', 'EQUIPO', 'IGUAL'],
+  'relacion_padres' => ['MUY_BUENA', 'BUENA', 'REGULAR', 'MALA', 'MUY_MALA'],
+  'habilidades' => ['B', 'N', 'M', 'BUENO', 'NORMAL', 'MALO'],
   ];
   return $catalog[$key] ?? [];
 }
@@ -47,7 +47,7 @@ function enum_value($raw, array $allowed): ?string
 {
   if ($raw === null || trim((string) $raw) === '')
     return null;
-  $fold = static function ($s): string {
+  $fold      = static function ($s): string {
     $s = strtoupper((string) $s);
     $s = strtr($s, ['Ñ' => 'N', 'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U', 'Ü' => 'U']);
     return str_replace([' ', '-'], '_', $s);
@@ -79,9 +79,15 @@ function enum_or_error(array &$errors, string $field, &$raw, array $allowed, str
 function habilidad_fields(): array
 {
   return [
-    'comprension_lectora', 'comprension_oral', 'resolucion_problemas',
-    'expresion_oral', 'expresion_escrita', 'vocabulario', 'calculo',
-    'expresion_grafica', 'ortografia',
+    'comprension_lectora',
+    'comprension_oral',
+    'resolucion_problemas',
+    'expresion_oral',
+    'expresion_escrita',
+    'vocabulario',
+    'calculo',
+    'expresion_grafica',
+    'ortografia',
   ];
 }
 
@@ -91,8 +97,14 @@ function habilidad_to_db($value): ?string
 {
   if ($value === null || trim((string) $value) === '')
     return null;
-  $map = ['B' => 'Bueno', 'N' => 'Normal', 'M' => 'Malo',
-    'BUENO' => 'Bueno', 'NORMAL' => 'Normal', 'MALO' => 'Malo'];
+  $map = [
+    'B' => 'Bueno',
+    'N' => 'Normal',
+    'M' => 'Malo',
+    'BUENO' => 'Bueno',
+    'NORMAL' => 'Normal',
+    'MALO' => 'Malo'
+  ];
   return $map[strtoupper(trim((string) $value))] ?? null;
 }
 
@@ -102,7 +114,7 @@ function db_enum_contains(string $table, string $column, string $value): bool
   static $types = [];
   $key = $table . '.' . $column;
   if (!array_key_exists($key, $types)) {
-    $rows = Capsule::select(
+    $rows        = Capsule::select(
       "SELECT COLUMN_TYPE FROM information_schema.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
       [$table, $column]
@@ -116,8 +128,10 @@ function db_enum_contains(string $table, string $column, string $value): bool
 // opción genérica (OTRA/OTRO/OTROS), para no perder la descripción.
 function merge_otro(&$target, string $genericCode, $freeText): void
 {
-  if (is_string($target) && $target === $genericCode
-    && is_string($freeText) && trim($freeText) !== '') {
+  if (
+    is_string($target) && $target === $genericCode
+    && is_string($freeText) && trim($freeText) !== ''
+  ) {
     $target = trim($freeText);
   }
 }
@@ -334,7 +348,7 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
 
   // Habilidades: el formulario envía claves planas (comprension_lectora, ...).
   // También se acepta el formato anidado `habilidades: {...}` y el prefijo `hab_*`.
-  $habIn  = is_array($in['habilidades'] ?? null) ? $in['habilidades'] : [];
+  $habIn = is_array($in['habilidades'] ?? null) ? $in['habilidades'] : [];
   foreach (habilidad_fields() as $hf) {
     $raw = $habIn[$hf] ?? $in['hab_' . $hf] ?? $in[$hf] ?? null;
     if (is_scalar($raw) && (string) $raw !== '')
@@ -496,8 +510,10 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
   enum_or_error($errors, 'reaccion_padres_calificaciones', $de['reaccionPadresCalificaciones'], enums('reaccion_padres'), 'Reacción ante las calificaciones');
   enum_or_error($errors, 'estudio_es', $ei['estudioEs'], enums('estudio_es'), 'Para ti estudiar es');
   // "Importante" existe en el ENUM a partir de db/migracion_paso3.sql
-  if (($ei['estudioEs'] ?? null) === 'IMPORTANTE'
-    && !db_enum_contains('expectativas_ingreso', 'estudio_es', 'IMPORTANTE')) {
+  if (
+    ($ei['estudioEs'] ?? null) === 'IMPORTANTE'
+    && !db_enum_contains('expectativas_ingreso', 'estudio_es', 'IMPORTANTE')
+  ) {
     $errors['estudio_es'] = 'La opción "Importante" aún no está habilitada en la BD: ejecuta db/migracion_paso3.sql y reintenta.';
   }
   // numero de control (obligatorio). El prefijo [B|C] es opcional: [B|C]?YY69####
@@ -539,8 +555,8 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
   // (el tutorado siempre cuenta; un 0 es ilógico venga de donde venga)
   $enterosDesdeUno = [
     'numIntegrantesFamilia' => 'num_integrantes_familia',
-    'numHermanos'           => 'num_hermanos',
-    'lugarQueOcupa'         => 'lugar_que_ocupa',
+    'numHermanos' => 'num_hermanos',
+    'lugarQueOcupa' => 'lugar_que_ocupa',
   ];
   foreach ($enterosDesdeUno as $camel => $snake) {
     $v = $df[$camel] ?? null;
@@ -551,7 +567,7 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
   // Edad de los padres: nunca menor que la edad del tutorado. Se deriva de la
   // fecha de nacimiento (dato duro del formulario); si falta, se usa el campo edad.
   $edadT = null;
-  $fNac = isset($dp['fechaNacimiento']) && is_string($dp['fechaNacimiento']) ? trim($dp['fechaNacimiento']) : '';
+  $fNac  = isset($dp['fechaNacimiento']) && is_string($dp['fechaNacimiento']) ? trim($dp['fechaNacimiento']) : '';
   if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $fNac)) {
     $nac = \DateTime::createFromFormat('Y-m-d', $fNac);
     if ($nac instanceof \DateTime && $nac->format('Y-m-d') === $fNac) {
@@ -728,8 +744,10 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
       ];
       // Campo nuevo (migracion en db/): solo se usa la columna si existe, para
       // que la captura no dependa de haber corrido el ALTER todavia.
-      if (($de['materiasReprobadas'] ?? null) !== null && $de['materiasReprobadas'] !== ''
-        && Capsule::getSchemaBuilder()->hasColumn('datos_escolares', 'materias_reprobadas')) {
+      if (
+        ($de['materiasReprobadas'] ?? null) !== null && $de['materiasReprobadas'] !== ''
+        && Capsule::getSchemaBuilder()->hasColumn('datos_escolares', 'materias_reprobadas')
+      ) {
         $escolarRow['materias_reprobadas'] = int_or_null($de['materiasReprobadas']);
       }
       DatosEscolares::updateOrCreate(['estudiante_id' => $estudiante->id], $escolarRow);
@@ -783,11 +801,11 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
       // el ALTER, CHANGE conserva esos valores en las columnas renombradas.
       if (!Capsule::getSchemaBuilder()->hasColumn('expectativas_ingreso', 'prio_paciente')) {
         $prioCompat = [
-          'prio_paciente'    => 'prio_entienda_jovenes',
-          'prio_estricto'    => 'prio_justo_evaluar',
-          'prio_justo'       => 'prio_permita_preguntar',
+          'prio_paciente' => 'prio_entienda_jovenes',
+          'prio_estricto' => 'prio_justo_evaluar',
+          'prio_justo' => 'prio_permita_preguntar',
           'prio_comprensivo' => 'prio_respete_e_imponga',
-          'prio_buen_humor'  => 'prio_no_se_enoje',
+          'prio_buen_humor' => 'prio_no_se_enoje',
         ];
         foreach ($prioCompat as $nuevo => $viejo) {
           $eiRow[$viejo] = $eiRow[$nuevo] ?? null;
@@ -864,8 +882,17 @@ $app->get('/api/estudiantes/exportar', function (Request $request, Response $res
   $spreadsheet = new Spreadsheet();
   $sheet       = $spreadsheet->getActiveSheet();
 
-  $headers = ['ID', 'Número de control', 'Nombre completo', 'Fecha nacimiento',
-    'Teléfono', 'Tutor', 'Periodo de captura', 'Capturado', 'Creado'];
+  $headers = [
+    'ID',
+    'Número de control',
+    'Nombre completo',
+    'Fecha nacimiento',
+    'Teléfono',
+    'Tutor',
+    'Periodo de captura',
+    'Capturado',
+    'Creado'
+  ];
   foreach ($headers as $col => $label) {
     $sheet->setCellValue(chr(65 + $col) . '1', $label);
   }
@@ -952,7 +979,7 @@ $app->post('/api/admin/tutores/{id}/upload', function (Request $request, Respons
       $hoja      = $lector->load($tmp)->getActiveSheet();
       $renglones = [];
       foreach ($hoja->getRowIterator() as $fila) {
-        $idx   = $fila->getRowIndex();
+        $idx = $fila->getRowIndex();
         // getCell() sobre una celda inexistente devuelve celda vacía (NULL)
         $v = $hoja->getCell('A' . $idx)->getValue();
         if ($v === null || is_bool($v)) {
@@ -970,8 +997,8 @@ $app->post('/api/admin/tutores/{id}/upload', function (Request $request, Respons
         $renglones[$idx] = $txt;
       }
       // Rellenar las filas ausentes para conservar la numeración original
-      $ultima        = $renglones === [] ? 0 : max(array_keys($renglones));
-      $lineasExcel   = [];
+      $ultima      = $renglones === [] ? 0 : max(array_keys($renglones));
+      $lineasExcel = [];
       for ($r = 1; $r <= $ultima; $r++) {
         $lineasExcel[] = $renglones[$r] ?? '';
       }
@@ -1007,12 +1034,25 @@ $app->post('/api/admin/tutores/{id}/upload', function (Request $request, Respons
     // marca de separador ("sep=;"). Se omiten sin error; cualquier otra
     // línea sigue validándose con la regex de abajo.
     $clave = strtr(strtolower($col0), [
-      'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u',
-      'Á' => 'a', 'É' => 'e', 'Í' => 'i', 'Ó' => 'o', 'Ú' => 'u', 'Ü' => 'u',
-      ' ' => '', '_' => '',
+      'á' => 'a',
+      'é' => 'e',
+      'í' => 'i',
+      'ó' => 'o',
+      'ú' => 'u',
+      'ü' => 'u',
+      'Á' => 'a',
+      'É' => 'e',
+      'Í' => 'i',
+      'Ó' => 'o',
+      'Ú' => 'u',
+      'Ü' => 'u',
+      ' ' => '',
+      '_' => '',
     ]);
-    if (in_array($clave, ['numerodecontrol', 'numerocontrol', 'matricula'], true)
-      || str_starts_with($clave, 'sep=')) {
+    if (
+      in_array($clave, ['numerodecontrol', 'numerocontrol', 'matricula'], true)
+      || str_starts_with($clave, 'sep=')
+    ) {
       continue;
     }
 
@@ -1123,74 +1163,186 @@ function table_columns(string $table): array
 function col_label(string $col): string
 {
   static $over = [
-    'numero_control'                => 'Número de control',
-    'nombre_completo'               => 'Nombre completo',
-    'fecha_nacimiento'              => 'Fecha de nacimiento',
-    'lugar_nacimiento'              => 'Lugar de nacimiento',
-    'genero'                        => 'Género',
-    'codigo_postal'                 => 'Código postal',
-    'zona'                          => 'Zona',
-    'telefono_movil'                => 'Teléfono móvil',
-    'habla_otra_lengua'             => '¿Habla otra lengua?',
-    'cual_lengua'                   => 'Otra lengua que habla',
-    'usa_transporte_publico'        => '¿Usa transporte público?',
-    'tiempo_traslado_transporte'    => 'Tiempo de traslado (transporte público)',
-    'costo_transporte'              => 'Costo del transporte',
-    'periodo_captura'               => 'Periodo de captura',
-    'capturado'                     => 'Capturado',
-    'created_at'                    => 'Creado',
-    'updated_at'                    => 'Actualizado',
-    'lugar_que_ocupa'               => 'Lugar que ocupa en la familia',
-    'situacion_especial'            => 'Situación especial',
-    'relacion_padres'               => 'Relación entre padres',
-    'trabaja_actualmente'           => '¿Trabaja actualmente?',
-    'horas_trabajo'                 => 'Horas de trabajo',
-    'empresa_trabajo'               => 'Empresa / lugar de trabajo',
-    'ingreso_mensual_familiar'      => 'Ingreso mensual familiar',
-    'institucion_procedencia'       => 'Institución de procedencia',
-    'reprobado_curso'               => '¿Ha reprobado algún curso?',
-    'satisfecho_resultados'         => '¿Satisfecho con los resultados?',
-    'ha_estado_becado'              => '¿Ha estado becado?',
-    'reaccion_padres_calificaciones'=> 'Reacción de los padres ante las calificaciones',
-    'comprension_lectora'           => 'Comprensión lectora',
-    'comprension_oral'              => 'Comprensión oral',
-    'resolucion_problemas'          => 'Resolución de problemas',
-    'expresion_oral'                => 'Expresión oral',
-    'expresion_escrita'             => 'Expresión escrita',
-    'expresion_grafica'             => 'Expresión gráfica',
-    'calculo'                       => 'Cálculo',
-    'ortografia'                    => 'Ortografía',
-    'padece_enfermedad'             => '¿Padece alguna enfermedad?',
-    'cual_enfermedad'               => '¿Cuál enfermedad?',
-    'condicion_fisica'              => 'Condición física',
-    'cual_condicion'                => '¿Cuál condición?',
-    'toma_medicacion'               => '¿Toma medicación?',
-    'cual_medicacion'               => '¿Cuál medicación?',
-    'ha_sido_operado'               => '¿Ha sido operado?',
-    'de_que_operacion'              => '¿De qué operación?',
-    'carrera_gusta'                 => '¿Le gusta su carrera?',
-    'que_mas_atrae'                 => '¿Qué más le atrae?',
-    'tiene_preocupacion_curso'      => '¿Tiene alguna preocupación?',
-    'que_preocupa'                  => '¿Qué le preocupa?',
-    'estudio_es'                    => 'Considera que estudiar es',
-    'forma_apoyo_institucion'       => 'Forma de apoyo de la institución',
-    'desea_apoyo_institucional'     => '¿Desea apoyo institucional?',
-    'tipo_apoyo'                    => 'Tipo de apoyo',
-    'causa_problemas_estudio'       => '¿Qué causa problemas de estudio?',
-    'preferencia_trabajo'           => 'Preferencia de trabajo',
-    'forma_pasartiempo'             => 'Cómo pasa el tiempo libre',
-    'forma_hacer_amigos'            => 'Cómo hace amigos',
-    'tiempo_estudio_casa'           => 'Tiempo de estudio en casa',
-    'cuenta_lugar_adecuado'         => '¿Cuenta con lugar adecuado para estudiar?',
-    'prio_explicacion_clara'        => 'Prioridad 1: que explique bien',
-    'prio_paciente'                 => 'Prioridad 2: que sea paciente',
-    'prio_estricto'                 => 'Prioridad 3: que sea estricto',
-    'prio_justo'                    => 'Prioridad 4: que sea justo',
-    'prio_comprensivo'              => 'Prioridad 5: que sea comprensivo',
-    'prio_buen_humor'               => 'Prioridad 6: buen sentido del humor',
-    'prio_otra'                     => 'Prioridad 7: otra cualidad',
+  'numero_control' => 'Número de control',
+  'nombre_completo' => 'Nombre completo',
+  'fecha_nacimiento' => 'Fecha de nacimiento',
+  'lugar_nacimiento' => 'Lugar de nacimiento',
+  'genero' => 'Género',
+  'codigo_postal' => 'Código postal',
+  'zona' => 'Zona',
+  'telefono_movil' => 'Teléfono móvil',
+  'habla_otra_lengua' => '¿Habla otra lengua?',
+  'cual_lengua' => 'Otra lengua que habla',
+  'usa_transporte_publico' => '¿Usa transporte público?',
+  'tiempo_traslado_transporte' => 'Tiempo de traslado (transporte público)',
+  'costo_transporte' => 'Costo del transporte',
+  'periodo_captura' => 'Periodo de captura',
+  'capturado' => 'Capturado',
+  'created_at' => 'Creado',
+  'updated_at' => 'Actualizado',
+  'lugar_que_ocupa' => 'Lugar que ocupa en la familia',
+  'situacion_especial' => 'Situación especial',
+  'relacion_padres' => 'Relación entre padres',
+  'trabaja_actualmente' => '¿Trabaja actualmente?',
+  'horas_trabajo' => 'Horas de trabajo',
+  'empresa_trabajo' => 'Empresa / lugar de trabajo',
+  'ingreso_mensual_familiar' => 'Ingreso mensual familiar',
+  'institucion_procedencia' => 'Institución de procedencia',
+  'reprobado_curso' => '¿Ha reprobado algún curso?',
+  'satisfecho_resultados' => '¿Satisfecho con los resultados?',
+  'ha_estado_becado' => '¿Ha estado becado?',
+  'reaccion_padres_calificaciones' => 'Reacción de los padres ante las calificaciones',
+  'comprension_lectora' => 'Comprensión lectora',
+  'comprension_oral' => 'Comprensión oral',
+  'resolucion_problemas' => 'Resolución de problemas',
+  'expresion_oral' => 'Expresión oral',
+  'expresion_escrita' => 'Expresión escrita',
+  'expresion_grafica' => 'Expresión gráfica',
+  'calculo' => 'Cálculo',
+  'ortografia' => 'Ortografía',
+  'padece_enfermedad' => '¿Padece alguna enfermedad?',
+  'cual_enfermedad' => '¿Cuál enfermedad?',
+  'condicion_fisica' => 'Condición física',
+  'cual_condicion' => '¿Cuál condición?',
+  'toma_medicacion' => '¿Toma medicación?',
+  'cual_medicacion' => '¿Cuál medicación?',
+  'ha_sido_operado' => '¿Ha sido operado?',
+  'de_que_operacion' => '¿De qué operación?',
+  'carrera_gusta' => '¿Le gusta su carrera?',
+  'que_mas_atrae' => '¿Qué más le atrae?',
+  'tiene_preocupacion_curso' => '¿Tiene alguna preocupación?',
+  'que_preocupa' => '¿Qué le preocupa?',
+  'estudio_es' => 'Considera que estudiar es',
+  'forma_apoyo_institucion' => 'Forma de apoyo de la institución',
+  'desea_apoyo_institucional' => '¿Desea apoyo institucional?',
+  'tipo_apoyo' => 'Tipo de apoyo',
+  'causa_problemas_estudio' => '¿Qué causa problemas de estudio?',
+  'preferencia_trabajo' => 'Preferencia de trabajo',
+  'forma_pasartiempo' => 'Cómo pasa el tiempo libre',
+  'forma_hacer_amigos' => 'Cómo hace amigos',
+  'tiempo_estudio_casa' => 'Tiempo de estudio en casa',
+  'cuenta_lugar_adecuado' => '¿Cuenta con lugar adecuado para estudiar?',
+  'prio_explicacion_clara' => 'Prioridad 1: que explique bien',
+  'prio_paciente' => 'Prioridad 2: que sea paciente',
+  'prio_estricto' => 'Prioridad 3: que sea estricto',
+  'prio_justo' => 'Prioridad 4: que sea justo',
+  'prio_comprensivo' => 'Prioridad 5: que sea comprensivo',
+  'prio_buen_humor' => 'Prioridad 6: buen sentido del humor',
+  'prio_otra' => 'Prioridad 7: otra cualidad',
   ];
   return $over[$col] ?? ucfirst(str_replace('_', ' ', $col));
+}
+
+// Etiqueta literal de un valor de opción del formulario (lo que el tutor
+// vio en pantalla). Cubre columnas VARCHAR/TEXT que guardan el código de la
+// opción (ej. MUY_BUENA, NINGUNA); los ENUM y booleanos se formatean antes.
+// Generado desde los <option> de public/form.html.
+function value_label(string $v): ?string
+{
+  static $map = [
+  'F' => 'Femenino',
+  'M' => 'Masculino',
+  'NB' => 'No binario',
+  'SOLTERO' => 'Soltero/a',
+  'CASADO' => 'Casado/a',
+  'DIVORCIADO' => 'Divorciado/a',
+  'VIUDO' => 'Viudo/a',
+  'UNION LIBRE' => 'Unión libre',
+  'OTRO' => 'Otro',
+  'RURAL' => 'Rural',
+  'URBANA' => 'Urbana',
+  'PROPIA' => 'Propia',
+  'RENTADA' => 'Rentada',
+  'PRESTADA' => 'Prestada',
+  'OTRA' => 'Otra',
+  'SABE_LEER_ESCRIBIR' => 'Sabe leer y escribir',
+  'PRIMARIA_TERMINADA' => 'Primaria terminada',
+  'PRIMARIA_TRUNCA' => 'Primaria trunca',
+  'SECUNDARIA_TERMINADA' => 'Secundaria terminada',
+  'SECUNDARIA_TRUNCA' => 'Secundaria trunca',
+  'PREPARATORIA_TERMINADA' => 'Preparatoria terminada',
+  'PREPARATORIA_TRUNCA' => 'Preparatoria trunca',
+  'CARRERA_TECNICA_TERMINADA' => 'Carrera técnica terminada',
+  'CARRERA_TECNICA_TRUNCA' => 'Carrera técnica trunca',
+  'LICENCIATURA_TERMINADA' => 'Licenciatura terminada',
+  'LICENCIATURA_TRUNCA' => 'Licenciatura trunca',
+  'MAESTRIA_TERMINADA' => 'Maestría terminada',
+  'MAESTRIA_TRUNCA' => 'Maestría trunca',
+  'DOCTORADO_TERMINADO' => 'Doctorado terminado',
+  'DOCTORADO_TRUNCO' => 'Doctorado trunco',
+  'PADRE_Y_MADRE' => 'Padre y madre',
+  'PADRE' => 'Solo padre',
+  'MADRE' => 'Solo madre',
+  'ABUELOS' => 'Abuelos',
+  'OTROS' => 'Otros (especificar)',
+  'NINGUNA' => 'Ninguna',
+  'FALLECIMIENTO_PADRE' => 'Fallecimiento del padre',
+  'FALLECIMIENTO_MADRE' => 'Fallecimiento de la madre',
+  'SEPARACION_O_DIVORCIO' => 'Separación / Divorcio de los padres',
+  'ABANDONO' => 'Abandono',
+  'ENFERMEDAD_GRAVE_FAMILIAR' => 'Enfermedad grave de algún familiar',
+  'MUY_BUENA' => 'Muy buena',
+  'BUENA' => 'Buena',
+  'REGULAR' => 'Regular',
+  'MALA' => 'Mala',
+  'MUY_MALA' => 'Muy mala',
+  'MUY_BUENO' => 'Muy bueno',
+  'BUENO' => 'Bueno',
+  'MALO' => 'Malo',
+  'MUY_MALO' => 'Muy malo',
+  'B' => 'B',
+  'N' => 'N',
+  'MUY_BIEN' => 'Muy bien',
+  'NORMAL' => 'Normal',
+  'MUY_MAL' => 'Muy mal',
+  'NO_SABEN' => 'No saben',
+  'NO_LES_IMPORTA' => 'No les importa',
+  'PRIMARIA' => 'Primaria',
+  'SECUNDARIA' => 'Secundaria',
+  'BACHILLERATO' => 'Bachillerato',
+  'MANUTENCION' => 'Manutención',
+  'ALIMENTACION' => 'Alimentación',
+  'TRANSPORTE' => 'Transporte',
+  'TALENTO_DEPORTIVO' => 'Talento Deportivo',
+  'TALENTO_ARTISTICO' => 'Talento Artístico',
+  'APROVECHAMIENTO' => 'Aprovechamiento Académico',
+  'IMPORTANTE' => 'Importante',
+  'INTERESANTE' => 'Algo interesante',
+  'ABURRIDO' => 'Algo aburrido',
+  'UTIL' => 'Algo útil',
+  'IMPUESTO' => 'Impuesto por mis padres',
+  'PASATIEMPO' => 'Un pasatiempo',
+  'AMIGOS' => 'Un espacio para estar con mis amigos',
+  'ACADEMICO' => 'Académico',
+  'PSICOLOGICO' => 'Psicológico',
+  'ORIENTACION' => 'Orientación',
+  'Me organizo mal' => 'Me organizo mal',
+  'No me interesa' => 'No me interesa',
+  'Me distraigo' => 'Me distraigo',
+  'No tengo lugar para estudiar' => 'No tengo lugar para estudiar',
+  'SOLO' => 'Solo/a',
+  'COMPANERO' => 'Con algún compañero/a',
+  'EQUIPO' => 'En equipo',
+  'IGUAL' => 'Me da igual',
+  'DIABETES' => 'Diabetes',
+  'HIPERTENSION' => 'Hipertensión',
+  'ASMA' => 'Asma',
+  'ALERGIAS' => 'Alergias',
+  'VISUAL' => 'Discapacidad visual',
+  'AUDITIVA' => 'Discapacidad auditiva',
+  'MOTRIZ' => 'Discapacidad motriz',
+  'AMBOS' => 'Ambos',
+  'RECURSO_PROPIO' => 'Recurso propio',
+  'OTRO_FAMILIAR' => 'Otro familiar',
+  'MANTENER_A_MIS_ESTUDIOS' => 'Mantener a mis estudios',
+  'AYUDAR_A_MIS_PADRES' => 'Ayudar a mis padres',
+  'MANTENER_A_MI_FAMILIA' => 'Mantener a mi familia',
+  'MENOS_DE_10_MIN' => 'Menos de 10 minutos',
+  'DE_10_A_30_MIN' => 'De 10 a 30 minutos',
+  'MAS_DE_30_MIN' => 'Más de 30 minutos',
+  '1_HORA_O_MAS' => '1 hora o más',
+  ];
+  return $map[$v] ?? null;
 }
 
 // Formato de celda: Sí/No en booleanos, enum legible (guion bajo -> espacio),
@@ -1201,6 +1353,13 @@ function cell_text($val, array $meta): string
     return '';
   if (($meta['ct'] ?? '') === 'tinyint(1)')
     return $val ? 'Sí' : 'No';
+  // Códigos de opciones del formulario -> literal lo que el tutor vio
+  // (MUY_BUENA -> Muy buena, CASADO -> Casado/a, M -> Masculino...).
+  if (is_string($val)) {
+    $lbl = value_label($val);
+    if ($lbl !== null)
+      return $lbl;
+  }
   if (($meta['dt'] ?? '') === 'enum')
     return str_replace('_', ' ', (string) $val);
   return is_scalar($val) ? (string) $val : '';
@@ -1226,6 +1385,20 @@ function write_sheet($sheet, string $title, array $headers, array $rows): void
   }
 }
 
+// [título, tabla, columnas a omitir] de cada bloque de datos del cuestionario.
+// Compartido por el Excel de exportación y la vista individual de respuestas.
+function data_bloques(): array
+{
+  return [
+    ['Datos personales', 'estudiantes', ['id', 'tutor_id']],
+    ['Datos familiares', 'datos_familiares', ['estudiante_id']],
+    ['Datos escolares', 'datos_escolares', ['estudiante_id']],
+    ['Habilidades', 'habilidades_escolares', ['estudiante_id']],
+    ['Datos médicos', 'datos_medicos', ['estudiante_id']],
+    ['Expectativas', 'expectativas_ingreso', ['estudiante_id']],
+  ];
+}
+
 // Endpoint admin: Excel con TODAS las respuestas de los tutorados de un tutor.
 // Una hoja por bloque de datos, enlazadas por `numero_control`:
 //   Datos personales · Datos familiares · Datos escolares ·
@@ -1242,15 +1415,7 @@ $app->get('/api/admin/tutores/{id}/exportar', function (Request $request, Respon
     return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
   }
 
-  // [título de hoja, tabla, columnas a omitir]
-  $bloques = [
-    ['Datos personales', 'estudiantes',           ['id', 'tutor_id']],
-    ['Datos familiares', 'datos_familiares',      ['estudiante_id']],
-    ['Datos escolares',  'datos_escolares',       ['estudiante_id']],
-    ['Habilidades',      'habilidades_escolares', ['estudiante_id']],
-    ['Datos médicos',    'datos_medicos',         ['estudiante_id']],
-    ['Expectativas',     'expectativas_ingreso',  ['estudiante_id']],
-  ];
+  $bloques = data_bloques();
 
   $spreadsheet = new Spreadsheet();
   $first       = true;
@@ -1271,7 +1436,7 @@ $app->get('/api/admin/tutores/{id}/exportar', function (Request $request, Respon
         $query = Capsule::table($table)
           ->join('estudiantes', 'estudiantes.id', '=', $table . '.estudiante_id')
           ->where('estudiantes.tutor_id', $tutorId);
-        $sel = ['estudiantes.numero_control AS numero_control'];
+        $sel   = ['estudiantes.numero_control AS numero_control'];
       }
       foreach ($cols as $c) {
         $sel[] = ($isMain ? '' : $table . '.') . $c . ' AS ' . $c;
@@ -1329,6 +1494,141 @@ $app->get('/api/admin/tutores/{id}/exportar', function (Request $request, Respon
 });
 
 
+// Endpoint admin: respuestas individuales de un tutorado (vista "Ver
+// respuestas" del modal). Devuelve los datos básicos del estudiante más sus
+// 6 bloques como {titulo, presente, campos:[{label, valor}]}, reutilizando
+// los mismos catálogos (col_label) y formateo (cell_text) del Excel. El
+// filtro por tutor impide consultar tutorados de otro tutor.
+$app->get('/api/admin/tutores/{id}/tutorados/{nc}', function (Request $request, Response $response, $args) {
+  if (!check_admin($request)) {
+    $response->getBody()->write(json_encode(['error' => 'Autenticación admin requerida']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
+  }
+  $tutorId = intval($args['id']);
+  $nc      = (string) $args['nc'];
+  $est     = Capsule::table('estudiantes')
+    ->where('tutor_id', $tutorId)
+    ->where('numero_control', $nc)
+    ->first();
+  if (!$est) {
+    $response->getBody()->write(json_encode(['error' => 'Tutorado no encontrado']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+  }
+
+  $bloques = [];
+  foreach (data_bloques() as [$title, $table, $skip]) {
+    $meta = table_columns($table);
+    $cols = array_values(array_diff(array_keys($meta), $skip));
+    try {
+      $row = $table === 'estudiantes'
+        ? Capsule::table('estudiantes')->where('id', $est->id)->first()
+        : Capsule::table($table)->where('estudiante_id', $est->id)->first();
+    } catch (\Throwable $e) {
+      $row = null;
+    }
+    $campos = [];
+    foreach ($cols as $c) {
+      $campos[] = [
+        'label' => col_label($c),
+        'valor' => $row ? cell_text($row->$c ?? null, $meta[$c] ?? []) : '',
+      ];
+    }
+    $bloques[] = ['titulo' => $title, 'presente' => $row !== null, 'campos' => $campos];
+  }
+
+  $payload = [
+    'estudiante' => [
+      'numero_control' => $est->numero_control,
+      'nombre_completo' => $est->nombre_completo,
+      'periodo_captura' => $est->periodo_captura,
+      'capturado' => $est->capturado,
+      'updated_at' => (string) ($est->updated_at ?? ''),
+    ],
+    'bloques' => $bloques,
+  ];
+  $response->getBody()->write(json_encode($payload));
+  return $response->withHeader('Content-Type', 'application/json');
+});
+
+
+// Endpoint admin: limpia LA CAPTURA del tutorado — vacía las 5 tablas de
+// respuestas y deja capturado=0 (vuelve a "Pendiente"). La fila base del
+// estudiante (preregistro del CSV) se conserva; sirve para rehacer una
+// captura hecha mal.
+$app->delete('/api/admin/tutores/{id}/tutorados/{nc}/captura', function (Request $request, Response $response, $args) {
+  if (!check_admin($request)) {
+    $response->getBody()->write(json_encode(['error' => 'Autenticación admin requerida']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
+  }
+  $tutorId = intval($args['id']);
+  $nc      = (string) $args['nc'];
+  $est     = Capsule::table('estudiantes')
+    ->where('tutor_id', $tutorId)
+    ->where('numero_control', $nc)
+    ->first();
+  if (!$est) {
+    $response->getBody()->write(json_encode(['error' => 'Tutorado no encontrado']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+  }
+
+  $borradas = [];
+  foreach ([
+    'datos_familiares',
+    'datos_escolares',
+    'habilidades_escolares',
+    'datos_medicos',
+    'expectativas_ingreso'
+  ] as $t) {
+    try {
+      $borradas[$t] = Capsule::table($t)->where('estudiante_id', $est->id)->delete();
+    } catch (\Throwable $e) {
+      $borradas[$t] = 0;
+    }
+  }
+  Capsule::table('estudiantes')->where('id', $est->id)->update([
+    'capturado' => 0,
+    'updated_at' => date('Y-m-d H:i:s'),
+  ]);
+
+  $response->getBody()->write(json_encode([
+    'status' => 'ok',
+    'modo' => 'limpiado',
+    'numero_control' => $nc,
+    'borradas' => $borradas,
+  ]));
+  return $response->withHeader('Content-Type', 'application/json');
+});
+
+
+// Endpoint admin: elimina el tutorado COMPLETO (cascada sobre las 5 tablas
+// de respuestas). Para registros de prueba o filas subidas por error.
+$app->delete('/api/admin/tutores/{id}/tutorados/{nc}', function (Request $request, Response $response, $args) {
+  if (!check_admin($request)) {
+    $response->getBody()->write(json_encode(['error' => 'Autenticación admin requerida']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
+  }
+  $tutorId = intval($args['id']);
+  $nc      = (string) $args['nc'];
+  $est     = Capsule::table('estudiantes')
+    ->where('tutor_id', $tutorId)
+    ->where('numero_control', $nc)
+    ->first();
+  if (!$est) {
+    $response->getBody()->write(json_encode(['error' => 'Tutorado no encontrado']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+  }
+
+  Capsule::table('estudiantes')->where('id', $est->id)->delete();
+
+  $response->getBody()->write(json_encode([
+    'status' => 'ok',
+    'modo' => 'eliminado',
+    'numero_control' => $nc,
+  ]));
+  return $response->withHeader('Content-Type', 'application/json');
+});
+
+
 // Endpoint admin: ping rápido para verificar credenciales admin
 $app->get('/api/admin/ping', function (Request $request, Response $response) {
   if (!check_admin($request)) {
@@ -1350,11 +1650,11 @@ $app->get('/api/admin/tutores', function (Request $request, Response $response) 
 
   // Desglose de avance por tutor. Una sola consulta agregada (sin N+1).
   // `capturado = 1` cuenta lo capturado; el resto (0 o NULL) queda pendiente.
-  $agg = Capsule::table('estudiantes')
+  $agg      = Capsule::table('estudiantes')
     ->selectRaw('tutor_id, COUNT(*) AS total, SUM(CASE WHEN capturado = 1 THEN 1 ELSE 0 END) AS done')
     ->groupBy('tutor_id')
     ->get();
-  $byTutor = [];
+  $byTutor  = [];
   $sinTutor = ['total' => 0, 'done' => 0];
   foreach ($agg as $a) {
     $bucket = ['total' => (int) $a->total, 'done' => (int) $a->done];
@@ -1368,7 +1668,7 @@ $app->get('/api/admin/tutores', function (Request $request, Response $response) 
   $gTotal = 0;
   $gDone  = 0;
   foreach ($rows as $r) {
-    $b = $byTutor[(int) $r->id] ?? ['total' => 0, 'done' => 0];
+    $b            = $byTutor[(int) $r->id] ?? ['total' => 0, 'done' => 0];
     $r->total     = $b['total'];
     $r->captured  = $b['done'];
     $r->pending   = $b['total'] - $b['done'];
@@ -1379,11 +1679,11 @@ $app->get('/api/admin/tutores', function (Request $request, Response $response) 
   $gDone  += $sinTutor['done'];
 
   $resumen = [
-    'total'           => $gTotal,
-    'captured'        => $gDone,
-    'pending'         => $gTotal - $gDone,
-    'sin_tutor'       => $sinTutor['total'],
-    'tutores'         => count($rows),
+    'total' => $gTotal,
+    'captured' => $gDone,
+    'pending' => $gTotal - $gDone,
+    'sin_tutor' => $sinTutor['total'],
+    'tutores' => count($rows),
     'tutores_activos' => $rows->where('active', 1)->count(),
   ];
 
@@ -1400,7 +1700,7 @@ $app->post('/api/admin/tutores', function (Request $request, Response $response)
   }
   // Acepta JSON (fetch + JSON.stringify) y form-urlencoded (URLSearchParams),
   // mismo patrón que el PUT de abajo.
-  $data = json_decode((string) $request->getBody(), true) ?: $request->getParsedBody();
+  $data   = json_decode((string) $request->getBody(), true) ?: $request->getParsedBody();
   $nombre = trim($data['nombre'] ?? '');
   $email  = trim($data['email'] ?? '');
   if ($nombre === '') {
@@ -1467,11 +1767,11 @@ $app->delete('/api/admin/tutores/{id}', function (Request $request, Response $re
 function settings_schema(): array
 {
   static $schema = [
-    'admin_password'        => ['type' => 'password', 'form' => true],
-    'form_active'           => ['type' => 'bool',     'form' => true],
-    'periodo'               => ['type' => 'text',     'form' => true],
-    'rate_limit_max'        => ['type' => 'int',      'form' => true],
-    'rate_limit_window_min' => ['type' => 'int',      'form' => true],
+  'admin_password' => ['type' => 'password', 'form' => true],
+  'form_active' => ['type' => 'bool', 'form' => true],
+  'periodo' => ['type' => 'text', 'form' => true],
+  'rate_limit_max' => ['type' => 'int', 'form' => true],
+  'rate_limit_window_min' => ['type' => 'int', 'form' => true],
   ];
   return $schema;
 }
@@ -1498,13 +1798,13 @@ $app->get('/api/admin/settings', function (Request $request, Response $response)
 
   $settings = [];
   foreach (Capsule::table('app_settings')->orderBy('key')->get() as $row) {
-    $meta = setting_meta($row->key);
+    $meta       = setting_meta($row->key);
     $settings[] = [
-      'key'        => $row->key,
-      'value'      => $meta['type'] === 'password' ? null : $row->value,
-      'has_value'  => $row->value !== null && $row->value !== '',
-      'type'       => $meta['type'],
-      'form'       => $meta['form'],
+      'key' => $row->key,
+      'value' => $meta['type'] === 'password' ? null : $row->value,
+      'has_value' => $row->value !== null && $row->value !== '',
+      'type' => $meta['type'],
+      'form' => $meta['form'],
       'updated_at' => $row->updated_at,
     ];
   }
@@ -1667,8 +1967,8 @@ $app->get('/{path:.*}', function (Request $request, Response $response, $args) {
   if ($wantsJson) {
     $response->getBody()->write(json_encode([
       'error' => 'Ruta no encontrada',
-      'path'  => $path,
-      'hint'  => $hintAdmin
+      'path' => $path,
+      'hint' => $hintAdmin
         ? 'El panel de administración está en /admin, no bajo /api/'
         : null,
     ]));
