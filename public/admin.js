@@ -13,6 +13,30 @@
     return opts;
   }
 
+  // Estado de carga en un botón: guarda su texto original y lo restaura.
+  function setBtnLoading(btn, on, texto) {
+    if (!btn) return;
+    if (on) {
+      if (!btn.dataset.txt) btn.dataset.txt = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = texto || "Cargando…";
+    } else {
+      btn.disabled = false;
+      if (btn.dataset.txt) {
+        btn.textContent = btn.dataset.txt;
+        delete btn.dataset.txt;
+      }
+    }
+  }
+
+  // Fila de carga (o de error) para los tbody que renderiza admin.js.
+  function filaCarga(texto, colspan, error) {
+    const icono = error ? "✕" : '<span class="spinner"></span>';
+    return (
+      '<tr><td class="celdaCarga" colspan="' + colspan + '">' + icono + " " + texto + "</td></tr>"
+    );
+  }
+
   async function ping() {
     const opts = setAuthHeader({ method: "GET" });
     const res = await fetch("/api/admin/ping", opts);
@@ -27,7 +51,15 @@
     }
     localStorage.setItem(adminKey, pw);
     $("loginMsg").textContent = "";
-    const ok = await ping();
+    setBtnLoading($("btnLogin"), true, "Entrando…");
+    let ok = false;
+    try {
+      ok = await ping();
+    } catch (ex) {
+      ok = false;
+    } finally {
+      setBtnLoading($("btnLogin"), false);
+    }
     if (!ok) {
       localStorage.removeItem(adminKey);
       $("loginMsg").textContent = "Contraseña incorrecta";
@@ -51,15 +83,26 @@
   }
 
   async function loadTutors() {
-    const opts = setAuthHeader({ method: "GET" });
-    const res = await fetch("/api/admin/tutores", opts);
-    if (!res.ok) {
-      alert("Error al obtener tutores");
+    const tbody = document.querySelector("#tutoresTable tbody");
+    setBtnLoading($("btnRefresh"), true, "Refrescando…");
+    tbody.innerHTML = filaCarga("Cargando tutores…", 10);
+    let res;
+    try {
+      res = await fetch(
+        "/api/admin/tutores",
+        setAuthHeader({ method: "GET" }),
+      );
+    } catch (ex) {
+      res = null;
+    }
+    if (!res || !res.ok) {
+      alert("Error al obtener tutores" + (res ? " (HTTP " + res.status + ")" : ""));
+      tbody.innerHTML = filaCarga("No se pudieron cargar los tutores.", 10, true);
+      setBtnLoading($("btnRefresh"), false);
       return;
     }
     const data = await res.json();
     renderResumen(data.resumen || {});
-    const tbody = document.querySelector("#tutoresTable tbody");
     tbody.innerHTML = "";
     data.tutores.forEach((t) => {
       const total = t.total || 0;
@@ -82,13 +125,13 @@
         </td>
         <td>
           <input type="file" data-id="${t.id}" class="fileInput" accept=".csv,.xls,.xlsx,text/csv" style="display:inline-block">
-          <button data-id="${t.id}" data-nombre="${nm}" class="btnUpload">Enviar lista</button>
+          <button data-id="${t.id}" data-nombre="${nm}" class="btnUpload" title="Enviar lista de preregistros" aria-label="Enviar lista"><svg class="ic" viewBox="0 0 24 24"><use href="#i-upload"></use></svg></button>
         </td>
         <td>
-          <button data-id="${t.id}" data-nombre="${nm}" class="btnSave">Guardar</button>
-          <button data-id="${t.id}" data-nombre="${nm}" class="btnView">Ver tutorados</button>
-          <button data-id="${t.id}" data-nombre="${nm}" class="btnDownload">Descargar respuestas</button>
-          <button data-id="${t.id}" data-nombre="${nm}" class="btnDelete">Eliminar</button>
+          <button data-id="${t.id}" data-nombre="${nm}" class="btnSave" title="Guardar cambios" aria-label="Guardar"><svg class="ic" viewBox="0 0 24 24"><use href="#i-save"></use></svg></button>
+          <button data-id="${t.id}" data-nombre="${nm}" class="btnView" title="Ver tutorados" aria-label="Ver tutorados"><svg class="ic" viewBox="0 0 24 24"><use href="#i-eye"></use></svg></button>
+          <button data-id="${t.id}" data-nombre="${nm}" class="btnDownload" title="Descargar respuestas (Excel)" aria-label="Descargar"><svg class="ic" viewBox="0 0 24 24"><use href="#i-download"></use></svg></button>
+          <button data-id="${t.id}" data-nombre="${nm}" class="btnDelete" title="Eliminar tutor" aria-label="Eliminar"><svg class="ic" viewBox="0 0 24 24"><use href="#i-trash"></use></svg></button>
         </td>`;
       tbody.appendChild(tr);
     });
@@ -105,6 +148,7 @@
     document
       .querySelectorAll(".btnDownload")
       .forEach((b) => (b.onclick = onDownload));
+    setBtnLoading($("btnRefresh"), false);
   }
 
   function escapeHtml(s) {
@@ -179,9 +223,10 @@
     const opts = setAuthHeader({ method: "POST", body: fd });
     // Estado de carga: el botón se bloquea y marca "Subiendo…" mientras el
     // archivo viaja (evita doble clic y subidas repetidas si la red tarda).
-    const original = btn.textContent;
+    // Se guarda innerHTML (no textContent) para restaurar el icono del botón.
+    const original = btn.innerHTML;
     btn.disabled = true;
-    btn.textContent = "Subiendo…";
+    btn.innerHTML = "Subiendo…";
     let data = null;
     let error = null;
     try {
@@ -192,7 +237,7 @@
       error = String(ex);
     } finally {
       btn.disabled = false;
-      btn.textContent = original;
+      btn.innerHTML = original;
     }
     if (error !== null) {
       alert("Error upload: " + error);
@@ -247,12 +292,28 @@
     const id = e.currentTarget.dataset.id;
     const nombre = e.currentTarget.dataset.nombre || "";
     resetModalView();
-    const res = await fetch(
-      "/api/admin/tutores/" + id + "/report",
-      setAuthHeader({ method: "GET" }),
+    // Abre el modal enseguida con estado de carga: mientras llega el reporte
+    // se ve el esqueleto en vez de una pantalla muerta.
+    lastListTitle = "Tutorados de " + nombre;
+    $("modalTitle").textContent = lastListTitle;
+    $("modalStats").textContent = "Cargando…";
+    document.querySelector("#tutoradosTable tbody").innerHTML = filaCarga(
+      "Cargando tutorados…",
+      6,
     );
-    if (!res.ok) {
-      alert("Error al obtener los tutorados");
+    $("modalTutorados").classList.remove("hidden");
+    let res;
+    try {
+      res = await fetch(
+        "/api/admin/tutores/" + id + "/report",
+        setAuthHeader({ method: "GET" }),
+      );
+      if (!res.ok) throw new Error("HTTP " + res.status);
+    } catch (err) {
+      alert(
+        "Error al obtener los tutorados (" + ((err && err.message) || err) + ")",
+      );
+      closeModal();
       return;
     }
     const d = await res.json();
@@ -286,10 +347,10 @@
           ok
             ? `<button class="btnVerResp" data-id="${id}" data-nc="${escapeHtml(
                 s.numero_control || "",
-              )}" data-nombre="${escapeHtml(s.nombre_completo || "")}">Ver respuestas</button>
+              )}" data-nombre="${escapeHtml(s.nombre_completo || "")}" title="Ver respuestas" aria-label="Ver respuestas"><svg class="ic" viewBox="0 0 24 24"><use href="#i-eye"></use></svg></button>
               <button class="btnDelTut" data-id="${id}" data-nc="${escapeHtml(
                 s.numero_control || "",
-              )}" data-nombre="${escapeHtml(s.nombre_completo || "")}">Eliminar</button>`
+              )}" data-nombre="${escapeHtml(s.nombre_completo || "")}" title="Eliminar tutorado" aria-label="Eliminar"><svg class="ic" viewBox="0 0 24 24"><use href="#i-trash"></use></svg></button>`
             : ""
         }</td>`;
       tbody.appendChild(tr);
@@ -310,6 +371,12 @@
     const id = btn.dataset.id;
     const nc = btn.dataset.nc;
     const nombre = btn.dataset.nombre || "";
+    // Estado de carga visible mientras llega la ficha.
+    $("fichaView").innerHTML =
+      '<div class="celdaCarga"><span class="spinner"></span> Cargando respuestas…</div>';
+    $("fichaView").classList.remove("hidden");
+    $("tutoradosLista").classList.add("hidden");
+    $("btnBackFicha").classList.remove("hidden");
     try {
       const res = await fetch(
         "/api/admin/tutores/" + id + "/tutorados/" + encodeURIComponent(nc),
@@ -323,6 +390,7 @@
           ((err && err.message) || err) +
           ")",
       );
+      backToList();
     }
   }
 
@@ -454,9 +522,10 @@
   async function onDownload(e) {
     const id = e.currentTarget.dataset.id;
     const btn = e.currentTarget;
-    const original = btn.textContent;
+    // innerHTML (no textContent): el botón es de icono y hay que restaurarlo.
+    const original = btn.innerHTML;
     btn.disabled = true;
-    btn.textContent = "Descargando…";
+    btn.innerHTML = "Descargando…";
     try {
       const res = await fetch(
         "/api/admin/tutores/" + id + "/exportar",
@@ -478,7 +547,7 @@
       alert("Error al descargar: " + err.message);
     } finally {
       btn.disabled = false;
-      btn.textContent = original;
+      btn.innerHTML = original;
     }
   }
 
@@ -495,9 +564,17 @@
   }
 
   async function loadSettings() {
-    const res = await fetch("/api/admin/settings", setAuthHeader({ method: "GET" }));
-    if (!res.ok) {
+    const tbody = document.querySelector("#settingsTable tbody");
+    tbody.innerHTML = filaCarga("Cargando configuración…", 4);
+    let res;
+    try {
+      res = await fetch("/api/admin/settings", setAuthHeader({ method: "GET" }));
+    } catch (ex) {
+      res = null;
+    }
+    if (!res || !res.ok) {
       settingsMsg("No se pudo cargar la configuración", true);
+      tbody.innerHTML = filaCarga("No se pudo cargar la configuración.", 4, true);
       return;
     }
     const list = (await res.json()).settings || [];
@@ -535,8 +612,8 @@
         <td>${escapeHtml(s.value === null ? "" : String(s.value))}</td>
         <td>${escapeHtml(String(s.updated_at || ""))}</td>
         <td>
-          <button class="btnEditSet" data-key="${escapeHtml(s.key)}">Editar</button>
-          <button class="btnDelSet" data-key="${escapeHtml(s.key)}">Eliminar</button>
+          <button class="btnEditSet" data-key="${escapeHtml(s.key)}" title="Editar clave" aria-label="Editar"><svg class="ic" viewBox="0 0 24 24"><use href="#i-edit"></use></svg></button>
+          <button class="btnDelSet" data-key="${escapeHtml(s.key)}" title="Eliminar clave" aria-label="Eliminar"><svg class="ic" viewBox="0 0 24 24"><use href="#i-trash"></use></svg></button>
         </td>`;
       tbody.appendChild(tr);
     });
