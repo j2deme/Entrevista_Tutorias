@@ -44,6 +44,8 @@
   }
 
   async function login() {
+    // Ya hay un intento en curso (Enter + clic): no disparar dos pings.
+    if ($("btnLogin").disabled) return;
     const pw = $("adminPassword").value.trim();
     if (!pw) {
       $("loginMsg").textContent = "Introduce contraseña";
@@ -699,6 +701,19 @@
 
   // wire UI
   $("btnLogin").onclick = login;
+  // Enter en el campo de contraseña entra igual que el botón.
+  $("adminPassword").onkeydown = (ev) => {
+    if (ev.key === "Enter") login();
+  };
+  // Escape cierra el modal (el clic en el fondo ya está más abajo).
+  document.onkeydown = (ev) => {
+    if (
+      (ev.key === "Escape" || ev.key === "Esc") &&
+      !$("modalTutorados").classList.contains("hidden")
+    ) {
+      closeModal();
+    }
+  };
   $("btnLogout").onclick = logout;
   $("btnRefresh").onclick = loadTutors;
   $("btnCreate").onclick = createTutor;
