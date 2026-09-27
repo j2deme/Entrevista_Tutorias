@@ -105,10 +105,10 @@
   "forma_hacer_amigos": "En el salón",
   "cuenta_lugar_adecuado": true,
   "prio_explicacion_clara": 1,
-  "prio_entienda_jovenes": 2,
-  "prio_justo_evaluar": 3,
-  "prio_permita_preguntar": 4,
-  "prio_respete_e_imponga": 5,
-  "prio_no_se_enoje": 6,
+  "prio_paciente": 2,
+  "prio_estricto": 3,
+  "prio_justo": 4,
+  "prio_comprensivo": 5,
+  "prio_buen_humor": 6,
   "prio_otra": "Que tenga laboratorios abiertos"
 }
