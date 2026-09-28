@@ -189,6 +189,17 @@ document.addEventListener("DOMContentLoaded", () => {
     aplicarMinEdadPadres(e.target.value && edad >= 0 ? edad : null);
   });
 
+  // Teléfono móvil: sólo dígitos, máximo 10 (máscara de entrada).
+  // Con complementa maxlength/pattern/inputmode del input: aunque el
+  // navegador permita teclear letras o pegar espacios, aquí se limpian
+  // al instante y jamás pasan al FormData.
+  const telInput = document.getElementById("telefonoMovil");
+  if (telInput) {
+    telInput.addEventListener("input", () => {
+      telInput.value = telInput.value.replace(/\D/g, "").slice(0, 10);
+    });
+  }
+
   // Toggles Condicionales
   setupToggle("hablaOtraLengua", "divCualLengua");
   setupToggle("trabajaActualmente", "divDatosTrabajo");
