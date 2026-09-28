@@ -2,6 +2,8 @@ services:
   app:
     build: .
     container_name: entrevistas_api
+    # Si el servidor reinicia, el contenedor vuelve a levantar solo
+    restart: unless-stopped
     volumes:
       - .:/var/www/html
     ports:
