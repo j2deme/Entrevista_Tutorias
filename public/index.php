@@ -195,6 +195,19 @@ function check_admin(Request $request)
   return hash_equals((string) $stored, (string) $sent);
 }
 
+// Periodo de campaña vigente (app_settings.periodo). Segmenta KPIs, listas
+// por tutor y descargas: cada generación se consulta aparte, sin acumular
+// periodos anteriores (esos quedan en la BD y en la exportación global).
+// Vacío => null y los consumidores no aplican filtro (comportamiento único).
+// Ojo: filas precargadas con periodo NULL quedan fuera del filtro; cargar
+// listas siempre con `periodo` configurado evita esa situación.
+function active_period(): ?string
+{
+  $v = Capsule::table('app_settings')->where('key', 'periodo')->value('value');
+  $v = is_string($v) ? trim($v) : $v;
+  return ($v === null || $v === '') ? null : (string) $v;
+}
+
 // Endpoint: listar tutores activos para selección en el formulario
 $app->get('/api/tutores', function (Request $request, Response $response) {
   $rows = Capsule::table('tutores')->where('active', 1)->select('id', 'nombre')->orderBy('nombre')->get();
@@ -666,7 +679,10 @@ $app->post('/api/estudiantes', function (Request $request, Response $response) {
           'tiempo_traslado_transporte' => $usaTransporte ? ($tiempoTraslado ?? $existing->tiempo_traslado_transporte) : null,
           'costo_transporte' => $usaTransporte ? ($costoTraslado ?? $existing->costo_transporte) : null,
           'tutor_id' => isset($dp['tutorId']) ? intval($dp['tutorId']) : $existing->tutor_id,
-          'periodo_captura' => $capturePeriod ?? $existing->periodo_captura,
+          // Inmutable: el periodo es el de carga (campaña/generación), no se
+          // re-estampa al capturar aunque el activo haya cambiado. Fallback
+          // sólo para filas antiguas precargadas sin periodo (NULL).
+          'periodo_captura' => $existing->periodo_captura ?? $capturePeriod,
           'capturado' => 1
         ]);
 
@@ -1069,9 +1085,8 @@ $app->post('/api/admin/tutores/{id}/upload', function (Request $request, Respons
         $existing      = Estudiante::where('numero_control', $nc)->first();
         if ($existing) {
           // Reasignar solo el tutor, sin tocar datos personales. periodo_captura
-          // NO se mueve: en filas capturadas marca el periodo en que se capturó,
-          // y las pendientes conservan el periodo con el que se precargaron
-          // (al completar el form de todos modos se reescribe con el activo).
+          // es inmutable: marca la campaña/generación en la que se precargó y
+          // se conserva así aunque capture en otro periodo (auditoría).
           if ((int) $existing->tutor_id === $tutorId) {
             $summary['skipped']++;
             return;
@@ -1103,13 +1118,18 @@ $app->post('/api/admin/tutores/{id}/upload', function (Request $request, Respons
 // listado de números de control: contiene datos personales, requiere auth.
 function tutor_report_payload(int $tutorId): array
 {
-  $total    = Capsule::table('estudiantes')->where('tutor_id', $tutorId)->count();
-  $captured = Capsule::table('estudiantes')->where('tutor_id', $tutorId)->where('capturado', 1)->count();
-  $pending  = Capsule::table('estudiantes')->where('tutor_id', $tutorId)->where(function ($q) {
+  // Mismo alcance que los cards: sólo el periodo activo.
+  $p       = active_period();
+  $base    = fn() => Capsule::table('estudiantes')
+    ->where('tutor_id', $tutorId)
+    ->when($p, fn($q) => $q->where('estudiantes.periodo_captura', $p));
+  $total    = $base()->count();
+  $captured = $base()->where('capturado', 1)->count();
+  $pending  = $base()->where(function ($q) {
     $q->whereNull('capturado')->orWhere('capturado', 0);
   })->count();
 
-  $list = Capsule::table('estudiantes')->where('tutor_id', $tutorId)
+  $list = $base()
     ->select('id', 'numero_control', 'nombre_completo', 'periodo_captura', 'capturado', 'created_at', 'updated_at')
     ->orderBy('numero_control')->get();
 
@@ -1417,6 +1437,9 @@ $app->get('/api/admin/tutores/{id}/exportar', function (Request $request, Respon
 
   $bloques = data_bloques();
 
+  // Descarga por tutor: sólo periodo activo (histórico => exportación global).
+  $p = active_period();
+
   $spreadsheet = new Spreadsheet();
   $first       = true;
 
@@ -1428,14 +1451,16 @@ $app->get('/api/admin/tutores/{id}/exportar', function (Request $request, Respon
     try {
       if ($isMain) {
         // Datos personales: ya son los del propio estudiante del tutor.
-        $query = Capsule::table('estudiantes')->where('tutor_id', $tutorId);
+        $query = Capsule::table('estudiantes')->where('tutor_id', $tutorId)
+          ->when($p, fn($q) => $q->where('estudiantes.periodo_captura', $p));
         $sel   = [];
       } else {
         // Hijas: se enlazan con `estudiantes` para filtrar por tutor y
         // traer su número de control como primera columna.
         $query = Capsule::table($table)
           ->join('estudiantes', 'estudiantes.id', '=', $table . '.estudiante_id')
-          ->where('estudiantes.tutor_id', $tutorId);
+          ->where('estudiantes.tutor_id', $tutorId)
+          ->when($p, fn($q) => $q->where('estudiantes.periodo_captura', $p));
         $sel   = ['estudiantes.numero_control AS numero_control'];
       }
       foreach ($cols as $c) {
@@ -1650,8 +1675,11 @@ $app->get('/api/admin/tutores', function (Request $request, Response $response) 
 
   // Desglose de avance por tutor. Una sola consulta agregada (sin N+1).
   // `capturado = 1` cuenta lo capturado; el resto (0 o NULL) queda pendiente.
-  $agg      = Capsule::table('estudiantes')
+  // Sólo el periodo activo: cada generación se mide por separado.
+  $p   = active_period();
+  $agg = Capsule::table('estudiantes')
     ->selectRaw('tutor_id, COUNT(*) AS total, SUM(CASE WHEN capturado = 1 THEN 1 ELSE 0 END) AS done')
+    ->when($p, fn($q) => $q->where('estudiantes.periodo_captura', $p))
     ->groupBy('tutor_id')
     ->get();
   $byTutor  = [];
