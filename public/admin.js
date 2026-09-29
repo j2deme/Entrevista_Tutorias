@@ -87,6 +87,7 @@
   async function loadTutors() {
     const tbody = document.querySelector("#tutoresTable tbody");
     setBtnLoading($("btnRefresh"), true, "Refrescando…");
+    loadPeriodos(); // catálogo del selector del histórico (fire-and-forget)
     tbody.innerHTML = filaCarga("Cargando tutores…", 10);
     let res;
     try {
@@ -553,6 +554,65 @@
     }
   }
 
+  // Descarga el workbook histórico: todas las respuestas de todos los
+  // tutores, del periodo elegido o de todos ("Todos los periodos").
+  async function onDownloadHistorico() {
+    const btn = $("btnHistorico");
+    const periodo = $("periodoExport") ? $("periodoExport").value : "";
+    setBtnLoading(btn, true, "Generando…");
+    try {
+      const qs = periodo ? "?periodo=" + encodeURIComponent(periodo) : "";
+      const res = await fetch(
+        "/api/admin/exportar/historico" + qs,
+        setAuthHeader({ method: "GET" }),
+      );
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const m = cd.match(/filename="?([^";]+)"?/);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = m ? m[1] : "historico_entrevistas.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (err) {
+      alert("Error al descargar: " + err.message);
+    } finally {
+      setBtnLoading(btn, false);
+    }
+  }
+
+  // Llena el selector de periodos con los que tienen capturas, más el
+  // periodo activo (aunque aún no tenga registros). Se llama en cada
+  // refresco para que aparezca una nueva campaña apenas se configure.
+  async function loadPeriodos() {
+    try {
+      const res = await fetch(
+        "/api/admin/periodos",
+        setAuthHeader({ method: "GET" }),
+      );
+      if (!res.ok) return;
+      const j = await res.json();
+      const sel = $("periodoExport");
+      if (!sel || !Array.isArray(j.periodos)) return;
+      const actual = sel.value;
+      sel.innerHTML = '<option value="">Todos los periodos</option>';
+      j.periodos.forEach((p) => {
+        const o = document.createElement("option");
+        o.value = String(p);
+        o.textContent = String(p);
+        sel.appendChild(o);
+      });
+      sel.value = actual; // conservar la selección si sigue disponible
+      if (sel.selectedIndex < 0) sel.value = "";
+    } catch (ex) {
+      // Sin catálogo: queda sólo la opción "Todos los periodos".
+    }
+  }
+
   // --- Gestión de app_settings ------------------------------------------
 
   // key -> valor actual (para precargar el prompt de edición)
@@ -716,6 +776,7 @@
   };
   $("btnLogout").onclick = logout;
   $("btnRefresh").onclick = loadTutors;
+  $("btnHistorico").onclick = onDownloadHistorico;
   $("btnCreate").onclick = createTutor;
   $("btnCloseModal").onclick = closeModal;
   $("btnBackFicha").onclick = backToList;

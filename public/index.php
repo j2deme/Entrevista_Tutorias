@@ -1419,6 +1419,139 @@ function data_bloques(): array
   ];
 }
 
+// Endpoint admin: periodos con capturas (alimenta el selector de la
+// exportación histórica). Incluye el periodo activo aunque aún no tenga
+// registros, para que aparezca apenas se configure la nueva campaña.
+$app->get('/api/admin/periodos', function (Request $request, Response $response) {
+  if (!check_admin($request)) {
+    $response->getBody()->write(json_encode(['error' => 'Autenticación admin requerida']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
+  }
+  $periodos = Capsule::table('estudiantes')
+    ->whereNotNull('periodo_captura')
+    ->where('periodo_captura', '!=', '')
+    ->distinct()
+    ->pluck('periodo_captura')
+    ->map(fn ($v) => (string) $v)
+    ->all();
+  $activo = (string) (Capsule::table('app_settings')->where('key', 'periodo')->value('value') ?? '');
+  if ($activo !== '') {
+    $periodos[] = $activo;
+  }
+  $periodos = array_values(array_unique($periodos));
+  rsort($periodos, SORT_STRING);
+  $response->getBody()->write(json_encode(['periodos' => $periodos]));
+  return $response->withHeader('Content-Type', 'application/json');
+});
+
+// Endpoint admin: workbook histórico con TODAS las respuestas (todos los
+// tutores), de todos los periodos o sólo del indicado con ?periodo=YYYYN.
+// Es el "histórico de entrevistas": el XLS por tutor queda limitado al
+// periodo activo, así que la auditoría de campañas anteriores se hace aquí.
+// Mismo esquema multi-hoja que la exportación por tutor, más las columnas
+// Tutor (hoja principal) y Periodo (todas las hojas) para poder pivotear.
+$app->get('/api/admin/exportar/historico', function (Request $request, Response $response) {
+  if (!check_admin($request)) {
+    $response->getBody()->write(json_encode(['error' => 'Autenticación admin requerida']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(403);
+  }
+
+  // Filtro opcional de periodo: vacío/ausente => todos los periodos.
+  $raw = trim((string) ($request->getQueryParams()['periodo'] ?? ''));
+  if ($raw !== '' && !preg_match('/^[0-9]{1,10}$/', $raw)) {
+    $response->getBody()->write(json_encode(['error' => 'Periodo inválido']));
+    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+  }
+  $p = $raw !== '' ? $raw : null;
+
+  $bloques     = data_bloques();
+  $spreadsheet = new Spreadsheet();
+  $first       = true;
+
+  foreach ($bloques as [$title, $table, $skip]) {
+    $meta   = table_columns($table);
+    $cols   = array_values(array_diff(array_keys($meta), $skip));
+    $isMain = $table === 'estudiantes';
+
+    try {
+      if ($isMain) {
+        $query = Capsule::table('estudiantes')
+          ->leftJoin('tutores', 'tutores.id', '=', 'estudiantes.tutor_id')
+          ->when($p, fn ($q) => $q->where('estudiantes.periodo_captura', $p));
+        $sel = ['tutores.nombre AS tutor_nombre'];
+      } else {
+        // Hijas: enlazadas con `estudiantes` para traer su número de control
+        // y periodo (filtro cuando se pide un periodo concreto).
+        $query = Capsule::table($table)
+          ->join('estudiantes', 'estudiantes.id', '=', $table . '.estudiante_id')
+          ->when($p, fn ($q) => $q->where('estudiantes.periodo_captura', $p));
+        $sel = [
+          'estudiantes.numero_control AS numero_control',
+          'estudiantes.periodo_captura AS periodo_captura',
+        ];
+      }
+      foreach ($cols as $c) {
+        $sel[] = ($isMain ? 'estudiantes.' : $table . '.') . $c . ' AS ' . $c;
+      }
+
+      $rows = $query->select($sel)
+        ->orderBy('estudiantes.tutor_id')
+        ->orderBy('estudiantes.numero_control')
+        ->get();
+    } catch (\Throwable $e) {
+      // Tabla ausente: hoja sólo con encabezados en vez de abortar la baja.
+      error_log("exportar histórico: falló la tabla {$table}: " . $e->getMessage());
+      $rows = [];
+    }
+
+    $headers = [];
+    foreach ($cols as $c) {
+      $headers[] = col_label($c);
+    }
+    if ($isMain) {
+      array_unshift($headers, 'Tutor');
+    } else {
+      array_unshift($headers, col_label('periodo_captura'));
+      array_unshift($headers, col_label('numero_control'));
+    }
+
+    $data = [];
+    foreach ($rows as $row) {
+      $out = [];
+      foreach ($cols as $c) {
+        $out[] = cell_text($row->$c ?? null, $meta[$c] ?? []);
+      }
+      if ($isMain) {
+        array_unshift($out, (string) ($row->tutor_nombre ?? ''));
+      } else {
+        array_unshift($out, (string) ($row->periodo_captura ?? ''));
+        array_unshift($out, (string) ($row->numero_control ?? ''));
+      }
+      $data[] = $out;
+    }
+
+    if ($first) {
+      $sheet = $spreadsheet->getActiveSheet();
+      $first = false;
+    } else {
+      $sheet = $spreadsheet->createSheet();
+    }
+    write_sheet($sheet, $title, $headers, $data);
+  }
+
+  $filename = 'historico_entrevistas' . ($p ? '_' . $p : '') . '.xlsx';
+
+  $writer = new Xlsx($spreadsheet);
+  $stream = fopen('php://memory', 'r+');
+  $writer->save($stream);
+  rewind($stream);
+
+  return $response
+    ->withBody(new \Slim\Psr7\Stream($stream))
+    ->withHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    ->withHeader('Content-Disposition', 'attachment; filename="' . $filename . '"');
+});
+
 // Endpoint admin: Excel con TODAS las respuestas de los tutorados de un tutor.
 // Una hoja por bloque de datos, enlazadas por `numero_control`:
 //   Datos personales · Datos familiares · Datos escolares ·
