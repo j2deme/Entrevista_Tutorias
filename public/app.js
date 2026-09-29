@@ -1,15 +1,28 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // Obtener CSRF token desde el backend y colocarlo en el input oculto
-  fetch("/api/csrf")
-    .then((r) => r.json())
-    .then((j) => {
+  // Obtener CSRF token desde el backend y colocarlo en el input oculto.
+  // La misma función se reutiliza en el pre-envío y en el reintento, para que
+  // el token siempre esté fresco aunque el formulario haya estado abierto
+  // mucho tiempo (llenados largos desde móvil), se haya abierto en otra
+  // pestaña o el servidor haya reiniciado sus sesiones.
+  async function fetchCsrfToken() {
+    try {
+      const r = await fetch("/api/csrf");
+      const j = await r.json();
       if (j && j.csrfToken) {
         const el = document.getElementById("csrfToken");
         if (el) el.value = j.csrfToken;
         window.__csrfToken = j.csrfToken;
+        return j.csrfToken;
       }
-    })
-    .catch(() => {});
+    } catch (err) {
+      console.error("No se pudo obtener el token CSRF:", err);
+    }
+    // Endpoint no disponible: conservar el último token conocido.
+    return (
+      document.getElementById("csrfToken")?.value || window.__csrfToken || ""
+    );
+  }
+  fetchCsrfToken();
   // Cargar lista de tutores activos para el select
   async function loadTutors() {
     const sel = document.getElementById("tutorSelect");
@@ -529,14 +542,11 @@ document.addEventListener("DOMContentLoaded", () => {
       delete payload.motivo_trabajo_otro;
     }
 
-    // Asegurar honeypot y token CSRF en snake_case
+    // Asegurar honeypot en snake_case
     payload.hp_email = payload.hp_email || payload.hpEmail || "";
-    payload.csrf_token =
-      document.getElementById("csrfToken")?.value ||
-      window.__csrfToken ||
-      payload.csrf_token ||
-      payload.csrfToken ||
-      "";
+    // Token CSRF recién emitido justo antes de enviar: el llenado pudo durar
+    // más que la sesión del servidor sin afectar al estudiante.
+    payload.csrf_token = await fetchCsrfToken();
 
     // Tutor precargado: el select viene deshabilitado y FormData lo excluye,
     // así que se inyecta aquí (es exactamente el tutor que asignó el admin).
@@ -549,11 +559,27 @@ document.addEventListener("DOMContentLoaded", () => {
     clearFieldErrors();
 
     try {
-      const response = await fetch("/api/estudiantes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const doPost = () =>
+        fetch("/api/estudiantes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      let response = await doPost();
+
+      // Reintento único y silencioso: si el servidor rechazó el token CSRF
+      // (sesión expirada por un llenado largo u otra causa), se pide uno nuevo
+      // y se reenvía. El estudiante no ve ningún error y conserva sus datos.
+      if (response.status === 403) {
+        const err403 = await response.json().catch(() => ({}));
+        if (
+          typeof err403.error === "string" &&
+          /csrf/i.test(err403.error)
+        ) {
+          payload.csrf_token = await fetchCsrfToken();
+          response = await doPost();
+        }
+      }
 
       if (response.ok) {
         await response.json();
@@ -624,7 +650,21 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         const err = await response.json().catch(() => ({}));
         console.error("Error response", response.status, err);
-        alert("Error al guardar ficha: " + (err.error || response.statusText));
+        // Si el reintento tampoco pudo validar el token, avisar sin alarmar:
+        // los datos siguen intactos y un nuevo intento pedirá token fresco.
+        if (
+          response.status === 403 &&
+          typeof err.error === "string" &&
+          /csrf/i.test(err.error)
+        ) {
+          alert(
+            "No se pudo validar la sesión de seguridad. Tus datos siguen en el formulario: vuelve a pulsar «Guardar Registro» para reenviar.",
+          );
+        } else {
+          alert(
+            "Error al guardar ficha: " + (err.error || response.statusText),
+          );
+        }
       }
     } catch (err) {
       console.error("Error al guardar registro:", err);
